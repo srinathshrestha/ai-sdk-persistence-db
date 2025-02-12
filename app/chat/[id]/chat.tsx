@@ -5,6 +5,7 @@ import { Message, useChat } from "@ai-sdk/react";
 import { createIdGenerator } from "ai";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { MemoizedMarkdown } from "./memoized-markdown";
 
 export default function Chat({
   id,
@@ -61,10 +62,17 @@ export default function Chat({
               {m.role === "user" ? "User: " : "AI: "}
             </span>
             <div className="space-y-4">
-              {m.parts.map((part) => {
+              {m.parts.map((part, i) => {
                 switch (part.type) {
                   case "text":
-                    return <div key={part.text}>{part.text}</div>;
+                    return (
+                      <div
+                        key={m.id + "-part-" + i}
+                        className="prose"
+                      >
+                        <MemoizedMarkdown id={m.id} content={part.text} />
+                      </div>
+                    );
                   case "tool-invocation":
                     const { toolInvocation } = part;
                     return (
