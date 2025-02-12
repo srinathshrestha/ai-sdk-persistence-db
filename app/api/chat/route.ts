@@ -1,4 +1,4 @@
-import { createMessage, loadChat } from "@/lib/db/actions";
+import { upsertMessage, loadChat } from "@/lib/db/actions";
 import { openai } from "@ai-sdk/openai";
 import {
   appendClientMessage,
@@ -19,8 +19,8 @@ export async function POST(req: Request) {
   const { message, chatId }: { message: Message; chatId: string } =
     await req.json();
 
-  // add user message to database
-  await createMessage({ chatId, id: message.id, message });
+  // create or update last message in database
+  await upsertMessage({ chatId, id: message.id, message });
 
   // load the previous messages from the server:
   const previousMessages = await loadChat(chatId);
@@ -79,10 +79,9 @@ export async function POST(req: Request) {
           const newMessage = appendResponseMessages({
             messages,
             responseMessages: response.messages,
-          }).at(-1);
-          if (!newMessage) return;
+          }).at(-1)!;
 
-          await createMessage({
+          await upsertMessage({
             id: newMessage.id,
             chatId: chatId,
             message: newMessage,

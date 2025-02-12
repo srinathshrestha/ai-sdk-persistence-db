@@ -10,7 +10,7 @@ export const createChat = async () => {
   return result.id;
 };
 
-export const createMessage = async ({
+export const upsertMessage = async ({
   chatId,
   message,
   id,
