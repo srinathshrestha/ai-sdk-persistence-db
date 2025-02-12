@@ -5,6 +5,7 @@ import { Message, useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { deleteChat } from "@/lib/db/actions";
 import { redirect } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Chat({
   id,
@@ -26,7 +27,17 @@ export default function Chat({
       },
       generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
       maxSteps: 3,
+      onToolCall({ toolCall }) {
+        if (toolCall.toolName == "getLocation") {
+          return "London";
+        }
+      },
     });
+  useEffect(() => {
+    if (messages.length > 0) {
+      console.log("Messages:", messages);
+    }
+  }, [messages]);
 
   return (
     <div className="flex flex-col w-full max-w-md py-24 mx-auto stretch">
@@ -65,7 +76,7 @@ export default function Chat({
                     </span>
                     <span>
                       {toolInvocation.state === "result" ? (
-                        <pre>
+                        <pre className="font-mono">
                           {JSON.stringify(toolInvocation.result, null, 2)}
                         </pre>
                       ) : null}

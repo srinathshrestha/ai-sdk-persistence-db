@@ -1,7 +1,9 @@
 import { createMessage, loadChat } from "@/lib/db/actions";
 import { openai } from "@ai-sdk/openai";
 import {
+  appendClientMessage,
   appendResponseMessages,
+  createDataStreamResponse,
   createIdGenerator,
   Message,
   streamText,
@@ -9,49 +11,104 @@ import {
 } from "ai";
 import { z } from "zod";
 
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30;
+
+let count = 0;
+
 export async function POST(req: Request) {
+  // get the last message from the client:
   const { message, chatId }: { message: Message; chatId: string } =
     await req.json();
 
-  // add user message to db
-  await createMessage({ chatId, message, id: message.id });
+  // add user message to database
+  await createMessage({ chatId, id: message.id, message });
 
-  // get all chat messages
-  const messages = await loadChat(chatId);
+  // load the previous messages from the server:
+  const previousMessages = await loadChat(chatId);
 
-  const result = streamText({
-    model: openai("gpt-4o-mini"),
-    tools: {
-      weather: tool({
-        description: "Get the weather in a location",
-        parameters: z.object({
-          location: z.string().describe("The location to get the weather for"),
-        }),
-        execute: async ({ location }) => ({
-          location,
-          temperature: 72 + Math.floor(Math.random() * 21) - 10,
-        }),
-      }),
-    },
-    messages: messages.concat(message),
-    // id format for server-side messages:
-    experimental_generateMessageId: createIdGenerator({
-      prefix: "msgs",
-      size: 16,
-    }),
-    async onFinish({ response }) {
-      const newMessage = appendResponseMessages({
-        messages,
-        responseMessages: response.messages,
-      }).slice(-1)[0];
-
-      await createMessage({
-        id: newMessage.id,
-        chatId,
-        message: newMessage,
-      });
-    },
+  // append the new message to the previous messages:
+  const messages = appendClientMessage({
+    messages: previousMessages,
+    message,
   });
 
-  return result.toDataStreamResponse();
+  // immediately start streaming (solves RAG issues with status, etc.)
+  return createDataStreamResponse({
+    execute: (dataStream) => {
+      dataStream.writeMessageAnnotation({
+        start: "start",
+        count: count++,
+      });
+
+      const result = streamText({
+        model: openai("gpt-4o"),
+        messages,
+        toolCallStreaming: true,
+        maxSteps: 5, // multi-steps for server-side tools
+        tools: {
+          // server-side tool with execute function:
+          getWeatherInformation: tool({
+            description: "show the weather in a given city to the user",
+            parameters: z.object({ city: z.string() }),
+            execute: async ({ city }: { city: string }) => {
+              // Add artificial delay of 2 seconds
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              const weatherOptions = [
+                "sunny",
+                "cloudy",
+                "rainy",
+                "snowy",
+                "windy",
+              ];
+
+              const weather =
+                weatherOptions[
+                  Math.floor(Math.random() * weatherOptions.length)
+                ];
+
+              dataStream.writeMessageAnnotation({
+                city,
+                weather,
+              });
+
+              return weather;
+            },
+          }),
+          // client-side tool that is automatically executed on the client:
+          getLocation: tool({
+            description:
+              "Get the user location. Always ask for confirmation before using this tool.",
+            parameters: z.object({}),
+          }),
+        },
+        // id format for server-side messages:
+        experimental_generateMessageId: createIdGenerator({
+          prefix: "msgs",
+          size: 16,
+        }),
+        async onFinish({ response }) {
+          const newMessage = appendResponseMessages({
+            messages,
+            responseMessages: response.messages,
+          }).at(-1);
+          if (!newMessage) return;
+
+          await createMessage({
+            id: newMessage.id,
+            chatId: chatId,
+            message: newMessage,
+          });
+        },
+      });
+
+      result.mergeIntoDataStream(dataStream);
+    },
+    onError: (error) => {
+      // Error messages are masked by default for security reasons.
+      // If you want to expose the error message to the client, you can do so here:
+      return error instanceof Error ? error.message : String(error);
+    },
+  });
 }
