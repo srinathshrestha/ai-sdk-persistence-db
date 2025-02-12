@@ -14,8 +14,6 @@ import { z } from "zod";
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
-let count = 0;
-
 export async function POST(req: Request) {
   // get the last message from the client:
   const { message, chatId }: { message: Message; chatId: string } =
@@ -36,13 +34,8 @@ export async function POST(req: Request) {
   // immediately start streaming (solves RAG issues with status, etc.)
   return createDataStreamResponse({
     execute: (dataStream) => {
-      dataStream.writeMessageAnnotation({
-        start: "start",
-        count: count++,
-      });
-
       const result = streamText({
-        model: openai("gpt-4o"),
+        model: openai("gpt-4o-mini"),
         messages,
         toolCallStreaming: true,
         maxSteps: 5, // multi-steps for server-side tools
@@ -67,13 +60,7 @@ export async function POST(req: Request) {
                 weatherOptions[
                   Math.floor(Math.random() * weatherOptions.length)
                 ];
-
-              dataStream.writeMessageAnnotation({
-                city,
-                weather,
-              });
-
-              return weather;
+              return { city, weather };
             },
           }),
           // client-side tool that is automatically executed on the client:

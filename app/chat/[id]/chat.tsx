@@ -1,11 +1,10 @@
 "use client";
 
-import { createIdGenerator } from "ai";
-import { Message, useChat } from "@ai-sdk/react";
-import Link from "next/link";
 import { deleteChat } from "@/lib/db/actions";
+import { Message, useChat } from "@ai-sdk/react";
+import { createIdGenerator } from "ai";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { useEffect } from "react";
 
 export default function Chat({
   id,
@@ -33,11 +32,6 @@ export default function Chat({
         }
       },
     });
-  useEffect(() => {
-    if (messages.length > 0) {
-      console.log("Messages:", messages);
-    }
-  }, [messages]);
 
   return (
     <div className="flex flex-col w-full max-w-md py-24 mx-auto stretch">
@@ -60,35 +54,55 @@ export default function Chat({
           Delete Chat
         </button>
       </div>
-      {messages.map((m) => (
-        <div key={m.id} className="whitespace-pre-wrap">
-          {m.role === "user" ? "User: " : "AI: "}
-          {m.parts.map((part) => {
-            switch (part.type) {
-              case "text":
-                return <span key={part.text}>{part.text}</span>;
-              case "tool-invocation":
-                const { toolInvocation } = part;
-                return (
-                  <span key={`tool-${toolInvocation.toolName}`}>
-                    <span className="bg-zinc-50 p-1">
-                      Using Tool: {toolInvocation.toolName}
-                    </span>
-                    <span>
-                      {toolInvocation.state === "result" ? (
-                        <pre className="font-mono">
-                          {JSON.stringify(toolInvocation.result, null, 2)}
-                        </pre>
-                      ) : null}
-                    </span>
-                  </span>
-                );
-              default:
-                return null;
-            }
-          })}
-        </div>
-      ))}
+      <div className="space-y-8">
+        {messages.map((m) => (
+          <div key={m.id} className="whitespace-pre-wrap">
+            <span className="font-semibold text-sm">
+              {m.role === "user" ? "User: " : "AI: "}
+            </span>
+            <div className="space-y-4">
+              {m.parts.map((part) => {
+                switch (part.type) {
+                  case "text":
+                    return <div key={part.text}>{part.text}</div>;
+                  case "tool-invocation":
+                    const { toolInvocation } = part;
+                    return (
+                      <details
+                        key={`tool-${toolInvocation.toolCallId}`}
+                        className="relative p-2 rounded-lg bg-zinc-100 group"
+                      >
+                        <summary className="list-none cursor-pointer select-none flex justify-between items-center pr-2">
+                          <span className="inline-flex items-center px-1 py-0.5 text-xs font-medium rounded-md font-mono text-zinc-900">
+                            {toolInvocation.toolName}
+                          </span>
+                          {toolInvocation.state === "result" ? (
+                            <span className="text-xs text-zinc-500 ml-2">
+                              Click to expand
+                            </span>
+                          ) : (
+                            <span className="text-xs text-zinc-400 animate-pulse">
+                              calling...
+                            </span>
+                          )}
+                        </summary>
+                        {toolInvocation.state === "result" ? (
+                          <div className="mt-4 bg-zinc-50 p-2">
+                            <pre className="font-mono text-xs">
+                              {JSON.stringify(toolInvocation.result, null, 2)}
+                            </pre>
+                          </div>
+                        ) : null}
+                      </details>
+                    );
+                  default:
+                    return null;
+                }
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
 
       <form onSubmit={handleSubmit}>
         <input
