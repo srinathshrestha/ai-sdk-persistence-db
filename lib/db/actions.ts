@@ -1,9 +1,9 @@
 "use server";
 
-import { Message } from "ai";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chats, messages } from "@/lib/db/schema";
+import { UIMessage } from "ai";
 
 export const createChat = async () => {
   const [result] = await db.insert(chats).values({}).returning();
@@ -17,19 +17,20 @@ export const upsertMessage = async ({
 }: {
   id: string;
   chatId: string;
-  message: Message;
+  message: UIMessage;
 }) => {
   const [result] = await db
     .insert(messages)
     .values({
       chatId,
-      message,
+      parts: message.parts ?? [],
+      role: message.role,
       id,
     })
     .onConflictDoUpdate({
       target: messages.id,
       set: {
-        message,
+        parts: message.parts ?? [],
         chatId,
       },
     })
@@ -43,7 +44,7 @@ export const loadChat = async (chatId: string) => {
     .from(messages)
     .where(eq(messages.chatId, chatId))
     .orderBy(messages.createdAt);
-  return messagesResult.map((msg) => msg.message);
+  return messagesResult;
 };
 
 export const getChats = async () => {

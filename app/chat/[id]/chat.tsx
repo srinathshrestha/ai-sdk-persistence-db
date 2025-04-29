@@ -1,7 +1,8 @@
 "use client";
 
 import { deleteChat } from "@/lib/db/actions";
-import { Message, useChat } from "@ai-sdk/react";
+import { type UIMessage } from "ai";
+import {  useChat } from "@ai-sdk/react";
 import { createIdGenerator } from "ai";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -10,8 +11,8 @@ import { MemoizedMarkdown } from "./memoized-markdown";
 export default function Chat({
   id,
   initialMessages,
-}: { id?: string | undefined; initialMessages?: Message[] } = {}) {
-  const { input, isLoading, handleInputChange, handleSubmit, messages } =
+}: { id?: string | undefined; initialMessages?: UIMessage[] } = {}) {
+  const { input, status, handleInputChange, handleSubmit, messages } =
     useChat({
       api: "/api/chat",
       id, // use the provided chatId
@@ -118,7 +119,7 @@ export default function Chat({
           value={input}
           placeholder="Say something..."
           onChange={handleInputChange}
-          disabled={isLoading}
+          disabled={status !== "ready"}
         />
       </form>
     </div>

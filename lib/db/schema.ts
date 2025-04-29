@@ -1,5 +1,11 @@
-import { Message } from "ai";
-import { jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { UIMessage } from "ai";
+import {
+  jsonb,
+  pgEnum,
+  pgTable,
+  timestamp,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { customAlphabet } from "nanoid";
 
 const nanoid = customAlphabet(
@@ -12,6 +18,8 @@ export const chats = pgTable("chats", {
     .$defaultFn(() => nanoid()),
 });
 
+export const roleEnum = pgEnum("role", ["user", "assistant", "system", "data"]);
+
 export const messages = pgTable("messages", {
   id: varchar()
     .primaryKey()
@@ -20,5 +28,7 @@ export const messages = pgTable("messages", {
     .references(() => chats.id, { onDelete: "cascade" })
     .notNull(),
   createdAt: timestamp().defaultNow().notNull(),
-  message: jsonb().$type<Message>().notNull(),
+  parts: jsonb().$type<UIMessage["parts"]>().notNull(),
+  role: roleEnum().notNull(),
 });
+
