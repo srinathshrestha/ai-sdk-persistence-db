@@ -139,7 +139,8 @@ export default function Chat({
                       }
                     }
                   }}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  className="text-xs text-red-500 hover:text-red-700 disabled:cursor-not-allowed"
+                  disabled={status === "streaming" || status === "submitted"}
                 >
                   Delete
                 </button>
