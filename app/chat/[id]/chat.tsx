@@ -1,39 +1,46 @@
 "use client";
 
-import { deleteChat } from "@/lib/db/actions";
+import { deleteChat, deleteMessage } from "@/lib/db/actions";
 import { type UIMessage } from "ai";
-import {  useChat } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
 import { createIdGenerator } from "ai";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { MemoizedMarkdown } from "./memoized-markdown";
 
 export default function Chat({
   id,
   initialMessages,
 }: { id?: string | undefined; initialMessages?: UIMessage[] } = {}) {
-  const { input, status, handleInputChange, handleSubmit, messages } =
-    useChat({
-      api: "/api/chat",
-      id, // use the provided chatId
-      initialMessages, // initial messages if provided
-      sendExtraMessageFields: true, // send id and createdAt for each message
-      body: { chatId: id },
-      experimental_prepareRequestBody: ({ messages }) => {
-        const lastMessage = messages[messages.length - 1];
-        return {
-          chatId: id,
-          message: lastMessage,
-        };
-      },
-      generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
-      maxSteps: 3,
-      onToolCall({ toolCall }) {
-        if (toolCall.toolName == "getLocation") {
-          return "London";
-        }
-      },
-    });
+  const router = useRouter();
+  const {
+    input,
+    status,
+    handleInputChange,
+    handleSubmit,
+    messages,
+    setMessages,
+  } = useChat({
+    api: "/api/chat",
+    id, // use the provided chatId
+    initialMessages, // initial messages if provided
+    sendExtraMessageFields: true, // send id and createdAt for each message
+    body: { chatId: id },
+    experimental_prepareRequestBody: ({ messages }) => {
+      const lastMessage = messages[messages.length - 1];
+      return {
+        chatId: id,
+        message: lastMessage,
+      };
+    },
+    generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
+    maxSteps: 3,
+    onToolCall({ toolCall }) {
+      if (toolCall.toolName == "getLocation") {
+        return "London";
+      }
+    },
+  });
 
   return (
     <div className="flex flex-col w-full max-w-md py-24 mx-auto stretch">
@@ -67,10 +74,7 @@ export default function Chat({
                 switch (part.type) {
                   case "text":
                     return (
-                      <div
-                        key={m.id + "-part-" + i}
-                        className="prose"
-                      >
+                      <div key={m.id + "-part-" + i} className="prose">
                         <MemoizedMarkdown id={m.id} content={part.text} />
                       </div>
                     );
@@ -109,6 +113,38 @@ export default function Chat({
                 }
               })}
             </div>
+            {m.role === "user" && (
+              <div className="flex space-x-2 mt-2">
+                <button
+                  onClick={async () => {
+                    if (
+                      confirm(
+                        "Are you sure you want to proceed? This will delete all subsequent messages.",
+                      )
+                    ) {
+                      try {
+                        const result = await deleteMessage(m.id);
+                        if (result) {
+                          setMessages((prev) =>
+                            prev.filter(
+                              (message) =>
+                                !result
+                                  .flat()
+                                  .some((item) => item.id === message.id),
+                            ),
+                          );
+                        }
+                      } catch (error) {
+                        console.error("Error deleting chat:", error);
+                      }
+                    }
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

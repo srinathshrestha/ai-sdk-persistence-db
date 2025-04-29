@@ -28,7 +28,7 @@ export const messages = pgTable("messages", {
     .references(() => chats.id, { onDelete: "cascade" })
     .notNull(),
   createdAt: timestamp().defaultNow().notNull(),
+  // TODO: update type to UIMessagePart in AI SDK v5
   parts: jsonb().$type<UIMessage["parts"]>().notNull(),
   role: roleEnum().notNull(),
 });
-
