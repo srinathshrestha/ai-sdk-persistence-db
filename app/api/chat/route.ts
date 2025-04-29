@@ -5,7 +5,7 @@ import {
   appendResponseMessages,
   createDataStreamResponse,
   createIdGenerator,
-  Message,
+  UIMessage,
   streamText,
   tool,
 } from "ai";
@@ -16,7 +16,7 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   // get the last message from the client:
-  const { message, chatId }: { message: Message; chatId: string } =
+  const { message, chatId }: { message: UIMessage; chatId: string } =
     await req.json();
 
   // create or update last message in database
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   // append the new message to the previous messages:
   const messages = appendClientMessage({
-    messages: previousMessages,
+    messages: previousMessages.map((m) => ({ ...m, content: "" }) as UIMessage),
     message,
   });
 
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
           await upsertMessage({
             id: newMessage.id,
             chatId: chatId,
-            message: newMessage,
+            message: newMessage as UIMessage,
           });
         },
       });
