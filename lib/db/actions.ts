@@ -3,7 +3,7 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chats, messages } from "@/lib/db/schema";
-import { UIMessage } from "ai";
+import { MyUIMessage } from "../message-type";
 
 export const createChat = async () => {
   const [result] = await db.insert(chats).values({}).returning();
@@ -17,7 +17,7 @@ export const upsertMessage = async ({
 }: {
   id: string;
   chatId: string;
-  message: UIMessage;
+  message: MyUIMessage;
 }) => {
   const [result] = await db
     .insert(messages)
@@ -74,7 +74,8 @@ export const deleteMessage = async (messageId: string) => {
             eq(messages.chatId, targetMessage.chatId),
             gt(messages.createdAt, targetMessage.createdAt),
           ),
-        ).returning();
+        )
+        .returning();
 
       await tx.delete(messages).where(eq(messages.id, messageId));
 

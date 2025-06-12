@@ -1,38 +1,35 @@
 "use client";
 
 import { deleteChat, deleteMessage } from "@/lib/db/actions";
-import { type UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { createIdGenerator } from "ai";
 import Link from "next/link";
-import { redirect, useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import { MemoizedMarkdown } from "./memoized-markdown";
+import { useState } from "react";
+import { MyUIMessage } from "@/lib/message-type";
 
 export default function Chat({
   id,
   initialMessages,
-}: { id?: string | undefined; initialMessages?: UIMessage[] } = {}) {
-  const router = useRouter();
-  const {
-    input,
-    status,
-    handleInputChange,
-    handleSubmit,
-    messages,
-    setMessages,
-  } = useChat({
-    api: "/api/chat",
+}: { id?: string | undefined; initialMessages?: MyUIMessage[] } = {}) {
+  const [input, setInput] = useState("");
+  const { status, messages, setMessages, sendMessage } = useChat({
     id, // use the provided chatId
-    initialMessages, // initial messages if provided
-    sendExtraMessageFields: true, // send id and createdAt for each message
-    body: { chatId: id },
-    experimental_prepareRequestBody: ({ messages }) => {
-      const lastMessage = messages[messages.length - 1];
-      return {
-        chatId: id,
-        message: lastMessage,
-      };
-    },
+    messages: initialMessages, // initial messages if provided
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      prepareRequest: ({ messages }) => {
+        const lastMessage = messages[messages.length - 1];
+        return {
+          body: {
+            message: lastMessage,
+            chatId: id,
+          },
+        };
+      },
+    }),
     generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
     maxSteps: 3,
     onToolCall({ toolCall }) {
@@ -150,12 +147,20 @@ export default function Chat({
         ))}
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (input.trim()) {
+            sendMessage({ parts: [{ text: input, type: "text" }] });
+            setInput("");
+          }
+        }}
+      >
         <input
           className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl"
           value={input}
           placeholder="Say something..."
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           disabled={status !== "ready"}
         />
       </form>

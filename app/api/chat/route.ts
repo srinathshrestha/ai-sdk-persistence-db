@@ -1,13 +1,15 @@
 import { upsertMessage, loadChat } from "@/lib/db/actions";
+import { MyUIMessage } from "@/lib/message-type";
 import { openai } from "@ai-sdk/openai";
 import {
-  appendClientMessage,
-  appendResponseMessages,
-  createDataStreamResponse,
-  createIdGenerator,
   UIMessage,
   streamText,
   tool,
+  createUIMessageStream,
+  convertToModelMessages,
+  stepCountIs,
+  createUIMessageStreamResponse,
+  generateId,
 } from "ai";
 import { z } from "zod";
 
@@ -16,7 +18,7 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   // get the last message from the client:
-  const { message, chatId }: { message: UIMessage; chatId: string } =
+  const { message, chatId }: { message: MyUIMessage; chatId: string } =
     await req.json();
 
   // create or update last message in database
@@ -24,21 +26,15 @@ export async function POST(req: Request) {
 
   // load the previous messages from the server:
   const previousMessages = await loadChat(chatId);
-
-  // append the new message to the previous messages:
-  const messages = appendClientMessage({
-    messages: previousMessages.map((m) => ({ ...m, content: "" }) as UIMessage),
-    message,
-  });
+  const messages: MyUIMessage[] = [...previousMessages, message];
 
   // immediately start streaming (solves RAG issues with status, etc.)
-  return createDataStreamResponse({
-    execute: (dataStream) => {
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
       const result = streamText({
         model: openai("gpt-4o-mini"),
-        messages,
-        toolCallStreaming: true,
-        maxSteps: 5, // multi-steps for server-side tools
+        messages: convertToModelMessages(messages),
+        stopWhen: stepCountIs(5),
         tools: {
           // server-side tool with execute function:
           getWeatherInformation: tool({
@@ -70,31 +66,28 @@ export async function POST(req: Request) {
             parameters: z.object({}),
           }),
         },
-        // id format for server-side messages:
-        experimental_generateMessageId: createIdGenerator({
-          prefix: "msgs",
-          size: 16,
-        }),
-        async onFinish({ response }) {
-          const newMessage = appendResponseMessages({
-            messages,
-            responseMessages: response.messages,
-          }).at(-1)!;
-
-          await upsertMessage({
-            id: newMessage.id,
-            chatId: chatId,
-            message: newMessage as UIMessage,
-          });
-        },
       });
 
-      result.mergeIntoDataStream(dataStream);
+      result.consumeStream();
+      writer.merge(result.toUIMessageStream({ newMessageId: generateId() }));
     },
     onError: (error) => {
       // Error messages are masked by default for security reasons.
       // If you want to expose the error message to the client, you can do so here:
       return error instanceof Error ? error.message : String(error);
     },
+    originalMessages: messages,
+    onFinish: async ({ responseMessage }) => {
+      try {
+        await upsertMessage({
+          id: responseMessage.id,
+          chatId,
+          message: responseMessage,
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    },
   });
+  return createUIMessageStreamResponse({ stream });
 }

@@ -1,4 +1,3 @@
-import { UIMessage } from "ai";
 import {
   jsonb,
   pgEnum,
@@ -7,6 +6,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { customAlphabet } from "nanoid";
+import { MyUIMessage } from "../message-type";
 
 const nanoid = customAlphabet(
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
@@ -18,7 +18,7 @@ export const chats = pgTable("chats", {
     .$defaultFn(() => nanoid()),
 });
 
-export const roleEnum = pgEnum("role", ["user", "assistant", "system", "data"]);
+export const roleEnum = pgEnum("role", ["user", "assistant", "system"]);
 
 export const messages = pgTable("messages", {
   id: varchar()
@@ -29,6 +29,6 @@ export const messages = pgTable("messages", {
     .notNull(),
   createdAt: timestamp().defaultNow().notNull(),
   // TODO: update type to UIMessagePart in AI SDK v5
-  parts: jsonb().$type<UIMessage["parts"]>().notNull(),
+  parts: jsonb().$type<MyUIMessage["parts"]>().notNull(),
   role: roleEnum().notNull(),
 });
