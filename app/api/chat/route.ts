@@ -2,7 +2,6 @@ import { upsertMessage, loadChat } from "@/lib/db/actions";
 import { MyUIMessage } from "@/lib/message-type";
 import { openai } from "@ai-sdk/openai";
 import {
-  UIMessage,
   streamText,
   tool,
   createUIMessageStream,
@@ -27,10 +26,34 @@ export async function POST(req: Request) {
   // load the previous messages from the server:
   const previousMessages = await loadChat(chatId);
   const messages: MyUIMessage[] = [...previousMessages, message];
+  console.log("messages", messages);
 
   // immediately start streaming (solves RAG issues with status, etc.)
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
+      Math.random() > 0.5 &&
+        (() => {
+          writer.write({ type: "reasoning", text: "This is some reasoning" });
+          writer.write({ type: "reasoning-part-finish" });
+        })();
+      Math.random() > 0.5 &&
+        (() => {
+          writer.write({
+            type: "source-url",
+            sourceId: "https://example.com",
+            url: "https://example.com",
+          });
+        })();
+      Math.random() > 0.5 &&
+        (() => {
+          writer.write({
+            type: "source-document",
+            sourceId: "https://example.com",
+            mediaType: "file",
+            title: "Title",
+          });
+        })();
+
       const result = streamText({
         model: openai("gpt-4o-mini"),
         messages: convertToModelMessages(messages),

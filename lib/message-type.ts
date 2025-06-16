@@ -12,3 +12,7 @@ export const dataPartSchema = z.object({
 export type MyDataPart = z.infer<typeof dataPartSchema>;
 
 export type MyUIMessage = UIMessage<MyMetadata, MyDataPart>;
+
+export type MyUIMessagePart = MyUIMessage["parts"][number];
+
+// const t: MyUIMessagePart = { type: "tool-invocation", toolInvocation:  };

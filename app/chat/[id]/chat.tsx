@@ -69,6 +69,13 @@ export default function Chat({
             <div className="space-y-4">
               {m.parts.map((part, i) => {
                 switch (part.type) {
+                  case "reasoning":
+                    return (
+                      <div key={m.id + "-part-" + i} className="text-zinc-400">
+                        <label>Reasoning:</label>
+                        <MemoizedMarkdown id={m.id} content={part.text} />
+                      </div>
+                    );
                   case "text":
                     return (
                       <div key={m.id + "-part-" + i} className="prose">
@@ -104,6 +111,39 @@ export default function Chat({
                           </div>
                         ) : null}
                       </details>
+                    );
+                  case "source-url":
+                    return (
+                      <div
+                        key={m.id + "-part-" + i}
+                        className="bg-blue-50 p-2 rounded border-l-4 border-blue-400"
+                      >
+                        <span className="text-xs text-blue-600 font-medium">
+                          Source URL:
+                        </span>
+                        <a
+                          href={part.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-blue-600 hover:text-blue-800 underline text-sm mt-1"
+                        >
+                          {part.url}
+                        </a>
+                      </div>
+                    );
+                  case "source-document":
+                    return (
+                      <div
+                        key={m.id + "-part-" + i}
+                        className="bg-blue-50 p-2 rounded border-l-4 border-blue-400"
+                      >
+                        <span className="text-xs text-blue-600 font-medium">
+                          Source Document:
+                        </span>
+                        <div className="text-sm mt-1 text-blue-800">
+                          {part.title || "Document"}
+                        </div>
+                      </div>
                     );
                   default:
                     return null;
