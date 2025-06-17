@@ -64,7 +64,13 @@ export const parts = pgTable(
     source_document_filename: varchar(), // optional
 
     // Complex data stored as JSONB only when needed
-    toolInvocation: jsonb().$type<ToolInvocationUIPart>(),
+    // toolInvocation: jsonb().$type<ToolInvocationUIPart>(),
+    toolInvocation_toolName: varchar(),
+    toolInvocation_toolCallId: varchar(),
+    toolInvocation_args: jsonb().$type<unknown>(),
+    toolInvocation_result: jsonb().$type<{ result: unknown }>(),
+    toolInvocation_state:
+      varchar().$type<ToolInvocationUIPart["toolInvocation"]["state"]>(),
 
     // Data parts
     // e.g.
@@ -97,9 +103,9 @@ export const parts = pgTable(
     ),
     check(
       "tool_invocation_required_if_type_is_tool_invocation",
-      sql`CASE WHEN ${t.type} = 'tool_invocation' THEN ${t.toolInvocation} IS NOT NULL ELSE TRUE END`,
+      sql`CASE WHEN ${t.type} = 'tool_invocation' THEN ${t.toolInvocation_toolName} IS NOT NULL AND ${t.toolInvocation_toolCallId} IS NOT NULL AND ${t.toolInvocation_state} IS NOT NULL AND (${t.toolInvocation_state} != 'result' OR ${t.toolInvocation_result} IS NOT NULL) ELSE TRUE END`,
     ),
   ],
 );
 
-export type MyDBMessagePart = typeof parts.$inferInsert;
+export type MyDBUIMessagePart = typeof parts.$inferInsert;

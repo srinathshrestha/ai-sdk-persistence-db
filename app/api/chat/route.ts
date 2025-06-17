@@ -26,7 +26,6 @@ export async function POST(req: Request) {
   // load the previous messages from the server:
   const previousMessages = await loadChat(chatId);
   const messages: MyUIMessage[] = [...previousMessages, message];
-  console.log("messages", messages);
 
   // immediately start streaming (solves RAG issues with status, etc.)
   const stream = createUIMessageStream({
