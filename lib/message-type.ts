@@ -17,6 +17,3 @@ export type MyToolSet = InferUITools<typeof tools>;
 export type MyUIMessage = UIMessage<MyMetadata, MyDataPart, MyToolSet>;
 
 export type MyUIMessagePart = UIMessagePart<MyDataPart, MyToolSet>;
-// const test: MyUIMessagePart = {
-//   type: "tool-getLocation"
-// }

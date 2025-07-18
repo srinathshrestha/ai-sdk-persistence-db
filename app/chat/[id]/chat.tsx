@@ -191,17 +191,11 @@ export default function Chat({
                       )
                     ) {
                       try {
-                        const result = await deleteMessage(m.id);
-                        if (result) {
-                          setMessages((prev) =>
-                            prev.filter(
-                              (message) =>
-                                !result
-                                  .flat()
-                                  .some((item) => item.id === message.id),
-                            ),
-                          );
-                        }
+                        await deleteMessage(m.id);
+                        // Find the index of the current message
+                        const messageIndex = messages.findIndex(msg => msg.id === m.id);
+                        // Remove this message and all subsequent ones
+                        setMessages((prev) => prev.slice(0, messageIndex));
                       } catch (error) {
                         console.error("Error deleting chat:", error);
                       }

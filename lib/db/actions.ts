@@ -1,18 +1,17 @@
 "use server";
 
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chats, messages, MyDBUIMessagePart, parts } from "@/lib/db/schema";
-import { MyUIMessage, MyUIMessagePart } from "../message-type";
+import { MyUIMessage } from "../message-type";
+import {
+  mapUIMessagePartsToDBParts,
+  mapDBPartToUIMessagePart,
+} from "@/lib/utils/message-mapping";
 
 export const createChat = async () => {
-  try {
-    const [result] = await db.insert(chats).values({}).returning();
-    return result.id;
-  } catch (error) {
-    console.error("Error creating chat:", error);
-    throw error;
-  }
+  const [{ id }] = await db.insert(chats).values({}).returning();
+  return id;
 };
 
 export const upsertMessage = async ({
@@ -24,8 +23,10 @@ export const upsertMessage = async ({
   chatId: string;
   message: MyUIMessage;
 }) => {
-  try {
-    await db
+  const mappedDBUIParts = mapUIMessagePartsToDBParts(message.parts, id);
+
+  await db.transaction(async (tx) => {
+    await tx
       .insert(messages)
       .values({
         chatId,
@@ -37,328 +38,82 @@ export const upsertMessage = async ({
         set: {
           chatId,
         },
-      })
-      .returning();
+      });
 
-    // TODO: figure out why this is necessary and any way we can simplify
-    const result2 = await db
-      .delete(parts)
-      .where(eq(parts.messageId, message.id));
-    console.log(result2);
-
-    const mappedDBUIParts: MyDBUIMessagePart[] = message.parts.map((p, i) => {
-      switch (p.type) {
-        case "text":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            text_text: p.text,
-          };
-        case "reasoning":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            reasoning_text: p.text,
-            providerMetadata: p.providerMetadata,
-          };
-        case "file":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            file_mediaType: p.mediaType,
-            file_filename: p.filename,
-            file_url: p.url,
-          };
-        case "source-document":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            source_document_sourceId: p.sourceId,
-            source_document_mediaType: p.mediaType,
-            source_document_title: p.title,
-            source_document_filename: p.filename,
-            providerMetadata: p.providerMetadata,
-          };
-        case "source-url":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            source_url_sourceId: p.sourceId,
-            source_url_url: p.url,
-            source_url_title: p.title,
-            providerMetadata: p.providerMetadata,
-          };
-        case "step-start":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-          };
-        case "tool-getWeatherInformation":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            tool_getWeatherInformation_toolCallId: p.toolCallId,
-            tool_getWeatherInformation_state: p.state,
-            tool_getWeatherInformation_input:
-              p.state === "input-available" ? p.input : undefined,
-            tool_getWeatherInformation_output:
-              p.state === "output-available" ? p.output : undefined,
-          };
-        case "tool-getLocation":
-          return {
-            messageId: id,
-            order: i,
-            type: p.type,
-            tool_getLocation_toolCallId: p.toolCallId,
-            tool_getLocation_state: p.state,
-            tool_getLocation_input:
-              p.state === "input-available" ? p.input : undefined,
-            tool_getLocation_output:
-              p.state === "output-available" ? p.output : undefined,
-          };
-        default:
-          throw new Error(`Unsupported part type: ${p.type}`);
-      }
-    });
-
-    await db.insert(parts).values(mappedDBUIParts);
-    return {};
-  } catch (error) {
-    console.error("Error upserting message:", error);
-    throw error;
-  }
+    await tx.delete(parts).where(eq(parts.messageId, id));
+    if (mappedDBUIParts.length > 0) {
+      await tx.insert(parts).values(mappedDBUIParts);
+    }
+  });
 };
 
 export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
-  try {
-    const messagesWithParts = await db
-      .select()
-      .from(messages)
-      .leftJoin(parts, eq(parts.messageId, messages.id))
-      .where(eq(messages.chatId, chatId))
-      .orderBy(messages.createdAt, parts.order);
+  const chatMessages = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.chatId, chatId))
+    .orderBy(messages.createdAt);
 
-    const messagesMap = new Map<string, MyUIMessage>();
+  const messageParts = await db
+    .select()
+    .from(parts)
+    .where(
+      inArray(
+        parts.messageId,
+        db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(eq(messages.chatId, chatId)),
+      ),
+    )
+    .orderBy(parts.messageId, parts.order);
 
-    for (const row of messagesWithParts) {
-      const message = row.messages;
-      const part = row.parts;
-
-      if (!messagesMap.has(message.id)) {
-        messagesMap.set(message.id, {
-          id: message.id,
-          role: message.role,
-          parts: [],
-        });
-      }
-
-      const uiMessage = messagesMap.get(message.id)!;
-
-      if (part) {
-        let partData: MyUIMessagePart;
-
-        switch (part.type) {
-          // can force values like text_text! b/c we have dynamic not_null constraints set on type
-          case "text":
-            partData = {
-              type: part.type,
-              text: part.text_text!,
-            };
-            break;
-          case "reasoning":
-            partData = {
-              type: part.type,
-              text: part.reasoning_text!,
-              providerMetadata: part.providerMetadata ?? undefined,
-            };
-            break;
-          case "file":
-            partData = {
-              type: part.type,
-              mediaType: part.file_mediaType!,
-              filename: part.file_filename!,
-              url: part.file_url!,
-            };
-            break;
-          case "source-document":
-            partData = {
-              type: part.type,
-              sourceId: part.source_document_sourceId!,
-              mediaType: part.source_document_mediaType!,
-              title: part.source_document_title!,
-              filename: part.source_document_filename!,
-              providerMetadata: part.providerMetadata ?? undefined,
-            };
-            break;
-          case "source-url":
-            partData = {
-              type: part.type,
-              sourceId: part.source_url_sourceId!,
-              url: part.source_url_url!,
-              title: part.source_url_title!,
-              providerMetadata: part.providerMetadata ?? undefined,
-            };
-            break;
-          case "step-start":
-            partData = {
-              type: part.type,
-            };
-            break;
-          case "tool-getWeatherInformation":
-            if (!part.tool_getWeatherInformation_state) {
-              throw new Error("getWeatherInformation_state is undefined");
-            }
-            switch (part.tool_getWeatherInformation_state) {
-              case "input-streaming":
-                partData = {
-                  type: "tool-getWeatherInformation",
-                  state: "input-streaming",
-                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
-                  input: part.tool_getWeatherInformation_input!,
-                };
-                break;
-              case "input-available":
-                partData = {
-                  type: "tool-getWeatherInformation",
-                  state: "input-available",
-                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
-                  input: part.tool_getWeatherInformation_input!,
-                };
-                break;
-              case "output-available":
-                partData = {
-                  type: "tool-getWeatherInformation",
-                  state: "output-available",
-                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
-                  input: part.tool_getWeatherInformation_input!,
-                  output: part.tool_getWeatherInformation_output!,
-                };
-                break;
-              case "output-error":
-                partData = {
-                  type: "tool-getWeatherInformation",
-                  state: "output-error",
-                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
-                  input: part.tool_getWeatherInformation_input!,
-                  errorText: part.tool_getWeatherInformation_errorText!,
-                };
-                break;
-            }
-            break;
-          case "tool-getLocation":
-            if (!part.tool_getLocation_state) {
-              throw new Error("getWeatherInformation_state is undefined");
-            }
-            switch (part.tool_getLocation_state) {
-              case "input-streaming":
-                partData = {
-                  type: "tool-getLocation",
-                  state: "input-streaming",
-                  toolCallId: part.tool_getLocation_toolCallId!,
-                  input: part.tool_getLocation_input!,
-                };
-                break;
-              case "input-available":
-                partData = {
-                  type: "tool-getLocation",
-                  state: "input-available",
-                  toolCallId: part.tool_getLocation_toolCallId!,
-                  input: part.tool_getLocation_input!,
-                };
-                break;
-              case "output-available":
-                partData = {
-                  type: "tool-getLocation",
-                  state: "output-available",
-                  toolCallId: part.tool_getLocation_toolCallId!,
-                  input: part.tool_getLocation_input!,
-                  output: part.tool_getLocation_output!,
-                };
-                break;
-              case "output-error":
-                partData = {
-                  type: "tool-getLocation",
-                  state: "output-error",
-                  toolCallId: part.tool_getLocation_toolCallId!,
-                  input: part.tool_getLocation_input!,
-                  errorText: part.tool_getLocation_errorText!,
-                };
-                break;
-            }
-            break;
-          default:
-            throw new Error(`Unsupported part type: ${part.type}`);
-        }
-
-        uiMessage.parts.push(partData);
-      }
+  const partsMap = new Map<string, typeof messageParts>();
+  for (const part of messageParts) {
+    if (!partsMap.has(part.messageId)) {
+      partsMap.set(part.messageId, []);
     }
-
-    const messagesResult = Array.from(messagesMap.values());
-
-    return messagesResult;
-  } catch (error) {
-    console.error("Error fetching messages:", error);
-    throw error;
+    partsMap.get(part.messageId)!.push(part);
   }
+
+  return chatMessages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    parts: (partsMap.get(message.id) || []).map((part) =>
+      mapDBPartToUIMessagePart(part as MyDBUIMessagePart & { order: number }),
+    ),
+  }));
 };
 
 export const getChats = async () => {
-  try {
-    const c = await db.select().from(chats);
-    return c;
-  } catch (error) {
-    console.error("Error fetching chats:", error);
-    throw error;
-  }
+  return await db.select().from(chats);
 };
 
 export const deleteChat = async (chatId: string) => {
-  try {
-    await db.delete(chats).where(eq(chats.id, chatId));
-  } catch (error) {
-    console.error("Error deleting chat:", error);
-    throw error;
-  }
+  await db.delete(chats).where(eq(chats.id, chatId));
 };
 
 export const deleteMessage = async (messageId: string) => {
-  try {
-    return await db.transaction(async (tx) => {
-      const message = await tx
-        .select()
-        .from(messages)
-        .where(eq(messages.id, messageId))
-        .limit(1);
+  await db.transaction(async (tx) => {
+    const [targetMessage] = await tx
+      .select()
+      .from(messages)
+      .where(eq(messages.id, messageId))
+      .limit(1);
 
-      if (message.length > 0) {
-        const targetMessage = message[0];
+    if (!targetMessage) return;
 
-        const removed = await tx
-          .delete(messages)
-          .where(
-            and(
-              eq(messages.chatId, targetMessage.chatId),
-              gt(messages.createdAt, targetMessage.createdAt),
-            ),
-          )
-          .returning();
+    // Delete all messages after this one in the chat
+    await tx
+      .delete(messages)
+      .where(
+        and(
+          eq(messages.chatId, targetMessage.chatId),
+          gt(messages.createdAt, targetMessage.createdAt),
+        ),
+      );
 
-        await tx.delete(messages).where(eq(messages.id, messageId));
-
-        return removed;
-      }
-      return false;
-    });
-  } catch (error) {
-    console.error("Error deleting message:", error);
-    throw error;
-  }
+    // Delete the target message
+    await tx.delete(messages).where(eq(messages.id, messageId));
+  });
 };
