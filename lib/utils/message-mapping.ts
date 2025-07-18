@@ -1,5 +1,5 @@
 import { MyUIMessagePart } from "../message-type";
-import { MyDBUIMessagePart } from "@/lib/db/schema";
+import { MyDBUIMessagePart, MyDBUIMessagePartSelect } from "@/lib/db/schema";
 
 export const mapUIMessagePartsToDBParts = (
   messageParts: MyUIMessagePart[],
@@ -89,7 +89,7 @@ export const mapUIMessagePartsToDBParts = (
 };
 
 export const mapDBPartToUIMessagePart = (
-  part: MyDBUIMessagePart & { order: number },
+  part: MyDBUIMessagePartSelect,
 ): MyUIMessagePart => {
   switch (part.type) {
     case "text":

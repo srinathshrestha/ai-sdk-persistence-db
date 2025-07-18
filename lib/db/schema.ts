@@ -1,5 +1,6 @@
 import {
   check,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -27,7 +28,10 @@ export const messages = pgTable("messages", {
     .notNull(),
   createdAt: timestamp().defaultNow().notNull(),
   role: varchar().$type<MyUIMessage["role"]>().notNull(),
-});
+}, (table) => [
+  index("messages_chat_id_idx").on(table.chatId),
+  index("messages_chat_id_created_at_idx").on(table.chatId, table.createdAt),
+]);
 
 export const parts = pgTable(
   "parts",
@@ -87,6 +91,11 @@ export const parts = pgTable(
     providerMetadata: jsonb().$type<Record<string, any>>(),
   },
   (t) => [
+    // Indexes
+    index("parts_message_id_idx").on(t.messageId),
+    index("parts_message_id_order_idx").on(t.messageId, t.order),
+
+    // Check constraints
     check(
       "text_text_required_if_type_is_text",
       // This SQL expression enforces: if type = 'text' then text_text IS NOT NULL
@@ -112,3 +121,4 @@ export const parts = pgTable(
 );
 
 export type MyDBUIMessagePart = typeof parts.$inferInsert;
+export type MyDBUIMessagePartSelect = typeof parts.$inferSelect;

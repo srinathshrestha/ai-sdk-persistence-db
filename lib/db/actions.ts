@@ -1,8 +1,8 @@
 "use server";
 
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chats, messages, MyDBUIMessagePart, parts } from "@/lib/db/schema";
+import { chats, messages, parts } from "@/lib/db/schema";
 import { MyUIMessage } from "../message-type";
 import {
   mapUIMessagePartsToDBParts,
@@ -48,39 +48,47 @@ export const upsertMessage = async ({
 };
 
 export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
-  const chatMessages = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.chatId, chatId))
-    .orderBy(messages.createdAt);
+  const result = await db.query.messages.findMany({
+    where: eq(messages.chatId, chatId),
+    with: {
+      parts: {
+        orderBy: (parts, { asc }) => [asc(parts.order)],
+      },
+    },
+    orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+  });
 
-  const messageParts = await db
-    .select()
-    .from(parts)
-    .where(
-      inArray(
-        parts.messageId,
-        db
-          .select({ id: messages.id })
-          .from(messages)
-          .where(eq(messages.chatId, chatId)),
-      ),
-    )
-    .orderBy(parts.messageId, parts.order);
-
-  const partsMap = new Map<string, typeof messageParts>();
-  for (const part of messageParts) {
-    if (!partsMap.has(part.messageId)) {
-      partsMap.set(part.messageId, []);
-    }
-    partsMap.get(part.messageId)!.push(part);
-  }
-
-  return chatMessages.map((message) => ({
+  return result.map((message) => ({
     id: message.id,
     role: message.role,
-    parts: (partsMap.get(message.id) || []).map((part) =>
-      mapDBPartToUIMessagePart(part as MyDBUIMessagePart & { order: number }),
+    parts: message.parts.map((part) =>
+      mapDBPartToUIMessagePart(part),
+    ),
+  }));
+};
+
+export const loadChatWithPagination = async (
+  chatId: string,
+  limit = 50,
+  offset = 0,
+): Promise<MyUIMessage[]> => {
+  const result = await db.query.messages.findMany({
+    where: eq(messages.chatId, chatId),
+    with: {
+      parts: {
+        orderBy: (parts, { asc }) => [asc(parts.order)],
+      },
+    },
+    orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+    limit,
+    offset,
+  });
+
+  return result.map((message) => ({
+    id: message.id,
+    role: message.role,
+    parts: message.parts.map((part) =>
+      mapDBPartToUIMessagePart(part),
     ),
   }));
 };
@@ -113,7 +121,7 @@ export const deleteMessage = async (messageId: string) => {
         ),
       );
 
-    // Delete the target message
+    // Delete the target message (cascade delete will handle parts)
     await tx.delete(messages).where(eq(messages.id, messageId));
   });
 };
