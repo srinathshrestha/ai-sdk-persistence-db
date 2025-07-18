@@ -25,7 +25,7 @@ export const upsertMessage = async ({
   message: MyUIMessage;
 }) => {
   try {
-    const [result] = await db
+    await db
       .insert(messages)
       .values({
         chatId,
@@ -40,18 +40,24 @@ export const upsertMessage = async ({
       })
       .returning();
 
-    const p: MyDBUIMessagePart[] = message.parts.map((p, i) => {
+    // TODO: figure out why this is necessary and any way we can simplify
+    const result2 = await db
+      .delete(parts)
+      .where(eq(parts.messageId, message.id));
+    console.log(result2);
+
+    const mappedDBUIParts: MyDBUIMessagePart[] = message.parts.map((p, i) => {
       switch (p.type) {
         case "text":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
             text_text: p.text,
           };
         case "reasoning":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
             reasoning_text: p.text,
@@ -59,7 +65,7 @@ export const upsertMessage = async ({
           };
         case "file":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
             file_mediaType: p.mediaType,
@@ -68,7 +74,7 @@ export const upsertMessage = async ({
           };
         case "source-document":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
             source_document_sourceId: p.sourceId,
@@ -79,7 +85,7 @@ export const upsertMessage = async ({
           };
         case "source-url":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
             source_url_sourceId: p.sourceId,
@@ -89,31 +95,41 @@ export const upsertMessage = async ({
           };
         case "step-start":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
           };
-        case "tool-invocation":
+        case "tool-getWeatherInformation":
           return {
-            messageId: result.id,
+            messageId: id,
             order: i,
             type: p.type,
-            toolInvocation_toolName: p.toolInvocation.toolName,
-            toolInvocation_args: p.toolInvocation.args,
-            toolInvocation_toolCallId: p.toolInvocation.toolCallId,
-            toolInvocation_state: p.toolInvocation.state,
-            toolInvocation_result:
-              p.toolInvocation.state === "result"
-                ? { result: p.toolInvocation.result }
-                : undefined,
+            tool_getWeatherInformation_toolCallId: p.toolCallId,
+            tool_getWeatherInformation_state: p.state,
+            tool_getWeatherInformation_input:
+              p.state === "input-available" ? p.input : undefined,
+            tool_getWeatherInformation_output:
+              p.state === "output-available" ? p.output : undefined,
+          };
+        case "tool-getLocation":
+          return {
+            messageId: id,
+            order: i,
+            type: p.type,
+            tool_getLocation_toolCallId: p.toolCallId,
+            tool_getLocation_state: p.state,
+            tool_getLocation_input:
+              p.state === "input-available" ? p.input : undefined,
+            tool_getLocation_output:
+              p.state === "output-available" ? p.output : undefined,
           };
         default:
           throw new Error(`Unsupported part type: ${p.type}`);
       }
     });
 
-    await db.insert(parts).values(p);
-    return result;
+    await db.insert(parts).values(mappedDBUIParts);
+    return {};
   } catch (error) {
     console.error("Error upserting message:", error);
     throw error;
@@ -149,16 +165,17 @@ export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
         let partData: MyUIMessagePart;
 
         switch (part.type) {
+          // can force values like text_text! b/c we have dynamic not_null constraints set on type
           case "text":
             partData = {
               type: part.type,
-              text: part.text_text!, // can force text_text! b/c we have dynamic not_null constraints set on type
+              text: part.text_text!,
             };
             break;
           case "reasoning":
             partData = {
               type: part.type,
-              text: part.reasoning_text!, // can force reasoning_text! b/c we have dynamic not_null constraints set on type
+              text: part.reasoning_text!,
               providerMetadata: part.providerMetadata ?? undefined,
             };
             break;
@@ -194,17 +211,87 @@ export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
               type: part.type,
             };
             break;
-          case "tool-invocation":
-            partData = {
-              type: "tool-invocation",
-              toolInvocation: {
-                toolName: part.toolInvocation_toolName!,
-                args: part.toolInvocation_args,
-                result: part.toolInvocation_result?.result,
-                state: part.toolInvocation_state!,
-                toolCallId: part.toolInvocation_toolCallId!,
-              },
-            };
+          case "tool-getWeatherInformation":
+            if (!part.tool_getWeatherInformation_state) {
+              throw new Error("getWeatherInformation_state is undefined");
+            }
+            switch (part.tool_getWeatherInformation_state) {
+              case "input-streaming":
+                partData = {
+                  type: "tool-getWeatherInformation",
+                  state: "input-streaming",
+                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
+                  input: part.tool_getWeatherInformation_input!,
+                };
+                break;
+              case "input-available":
+                partData = {
+                  type: "tool-getWeatherInformation",
+                  state: "input-available",
+                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
+                  input: part.tool_getWeatherInformation_input!,
+                };
+                break;
+              case "output-available":
+                partData = {
+                  type: "tool-getWeatherInformation",
+                  state: "output-available",
+                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
+                  input: part.tool_getWeatherInformation_input!,
+                  output: part.tool_getWeatherInformation_output!,
+                };
+                break;
+              case "output-error":
+                partData = {
+                  type: "tool-getWeatherInformation",
+                  state: "output-error",
+                  toolCallId: part.tool_getWeatherInformation_toolCallId!,
+                  input: part.tool_getWeatherInformation_input!,
+                  errorText: part.tool_getWeatherInformation_errorText!,
+                };
+                break;
+            }
+            break;
+          case "tool-getLocation":
+            if (!part.tool_getLocation_state) {
+              throw new Error("getWeatherInformation_state is undefined");
+            }
+            switch (part.tool_getLocation_state) {
+              case "input-streaming":
+                partData = {
+                  type: "tool-getLocation",
+                  state: "input-streaming",
+                  toolCallId: part.tool_getLocation_toolCallId!,
+                  input: part.tool_getLocation_input!,
+                };
+                break;
+              case "input-available":
+                partData = {
+                  type: "tool-getLocation",
+                  state: "input-available",
+                  toolCallId: part.tool_getLocation_toolCallId!,
+                  input: part.tool_getLocation_input!,
+                };
+                break;
+              case "output-available":
+                partData = {
+                  type: "tool-getLocation",
+                  state: "output-available",
+                  toolCallId: part.tool_getLocation_toolCallId!,
+                  input: part.tool_getLocation_input!,
+                  output: part.tool_getLocation_output!,
+                };
+                break;
+              case "output-error":
+                partData = {
+                  type: "tool-getLocation",
+                  state: "output-error",
+                  toolCallId: part.tool_getLocation_toolCallId!,
+                  input: part.tool_getLocation_input!,
+                  errorText: part.tool_getLocation_errorText!,
+                };
+                break;
+            }
             break;
           default:
             throw new Error(`Unsupported part type: ${part.type}`);

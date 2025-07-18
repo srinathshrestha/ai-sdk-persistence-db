@@ -3,41 +3,48 @@
 import { deleteChat, deleteMessage } from "@/lib/db/actions";
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
-import { createIdGenerator } from "ai";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MemoizedMarkdown } from "./memoized-markdown";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MyUIMessage } from "@/lib/message-type";
 
 export default function Chat({
   id,
   initialMessages,
 }: { id?: string | undefined; initialMessages?: MyUIMessage[] } = {}) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
-  const { status, messages, setMessages, sendMessage } = useChat({
-    id, // use the provided chatId
-    messages: initialMessages, // initial messages if provided
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      prepareRequest: ({ messages }) => {
-        const lastMessage = messages[messages.length - 1];
-        return {
-          body: {
-            message: lastMessage,
-            chatId: id,
-          },
-        };
-      },
-    }),
-    generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
-    maxSteps: 3,
-    onToolCall({ toolCall }) {
-      if (toolCall.toolName == "getLocation") {
-        return "London";
-      }
-    },
-  });
+  const { status, messages, setMessages, sendMessage, addToolResult } =
+    useChat<MyUIMessage>({
+      id, // use the provided chatId
+      messages: initialMessages, // initial messages if provided
+      transport: new DefaultChatTransport({
+        api: "/api/chat",
+        prepareSendMessagesRequest: ({ messages }) => {
+          const lastMessage = messages[messages.length - 1];
+          return {
+            body: {
+              message: lastMessage,
+              chatId: id,
+            },
+          };
+        },
+      }),
+      // generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
+      // onToolCall({ toolCall }) {
+      //   if (toolCall.toolName == "getLocation") {
+      //     return { location: "London" };
+      //   }
+      // },
+    });
+  console.log(messages);
+
+  useEffect(() => {
+    if (status === "ready") {
+      inputRef?.current?.focus();
+    }
+  }, [status]);
 
   return (
     <div className="flex flex-col w-full max-w-md py-24 mx-auto stretch">
@@ -66,6 +73,7 @@ export default function Chat({
             <span className="font-semibold text-sm">
               {m.role === "user" ? "User: " : "AI: "}
             </span>
+            <span className="bg-gray-100 p-1 rounded-sm text-sm font-mono">{m.id}</span>
             <div className="space-y-4">
               {m.parts.map((part, i) => {
                 switch (part.type) {
@@ -78,22 +86,24 @@ export default function Chat({
                     );
                   case "text":
                     return (
-                      <div key={m.id + "-part-" + i} className="prose">
+                      <div
+                        key={m.id + "-part-" + i}
+                        className="prose dark:text-zinc-300"
+                      >
                         <MemoizedMarkdown id={m.id} content={part.text} />
                       </div>
                     );
-                  case "tool-invocation":
-                    const { toolInvocation } = part;
+                  case "tool-getWeatherInformation":
                     return (
                       <details
-                        key={`tool-${toolInvocation.toolCallId}`}
+                        key={`tool-${part.toolCallId}`}
                         className="relative p-2 rounded-lg bg-zinc-100 group"
                       >
                         <summary className="list-none cursor-pointer select-none flex justify-between items-center pr-2">
                           <span className="inline-flex items-center px-1 py-0.5 text-xs font-medium rounded-md font-mono text-zinc-900">
-                            {toolInvocation.toolName}
+                            getWeatherInformation
                           </span>
-                          {toolInvocation.state === "result" ? (
+                          {part.state === "output-available" ? (
                             <span className="text-xs text-zinc-500 ml-2">
                               Click to expand
                             </span>
@@ -103,14 +113,35 @@ export default function Chat({
                             </span>
                           )}
                         </summary>
-                        {toolInvocation.state === "result" ? (
+                        {part.state === "output-available" ? (
                           <div className="mt-4 bg-zinc-50 p-2">
                             <pre className="font-mono text-xs">
-                              {JSON.stringify(toolInvocation.result, null, 2)}
+                              {JSON.stringify(part.output, null, 2)}
                             </pre>
                           </div>
                         ) : null}
                       </details>
+                    );
+                  case "tool-getLocation":
+                    return (
+                      <div key={part.toolCallId}>
+                        {part.state === "output-available" ? (
+                          <div className="font-mono text-sm bg-zinc-200 dark:bg-zinc-800 w-fit px-1 rounded-sm">
+                            Result: {part.output.location}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              addToolResult({
+                                toolCallId: part.toolCallId,
+                                output: { location: "London" },
+                              })
+                            }
+                          >
+                            Get location
+                          </button>
+                        )}
+                      </div>
                     );
                   case "source-url":
                     return (
@@ -197,7 +228,8 @@ export default function Chat({
         }}
       >
         <input
-          className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 rounded shadow-xl"
+          ref={inputRef}
+          className="fixed bottom-0 w-full max-w-md p-2 mb-8 border border-gray-300 dark:border-zinc-800 dark:bg-zinc-900 rounded shadow-xl"
           value={input}
           placeholder="Say something..."
           onChange={(e) => setInput(e.target.value)}

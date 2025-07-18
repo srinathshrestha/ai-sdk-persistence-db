@@ -8,8 +8,9 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { MyUIMessage } from "../message-type";
-import { generateId, ToolInvocationUIPart } from "ai";
+import { generateId, InferToolInput, InferToolOutput, ToolUIPart } from "ai";
 import { sql } from "drizzle-orm";
+import { getWeatherInformation } from "@/ai/tools";
 
 export const chats = pgTable("chats", {
   id: varchar()
@@ -63,14 +64,20 @@ export const parts = pgTable(
     source_document_title: varchar(),
     source_document_filename: varchar(), // optional
 
-    // Complex data stored as JSONB only when needed
-    // toolInvocation: jsonb().$type<ToolInvocationUIPart>(),
-    toolInvocation_toolName: varchar(),
-    toolInvocation_toolCallId: varchar(),
-    toolInvocation_args: jsonb().$type<unknown>(),
-    toolInvocation_result: jsonb().$type<{ result: unknown }>(),
-    toolInvocation_state:
-      varchar().$type<ToolInvocationUIPart["toolInvocation"]["state"]>(),
+    // tools are stored in separate cols
+    tool_getWeatherInformation_toolCallId: varchar(),
+    tool_getWeatherInformation_state: varchar().$type<ToolUIPart["state"]>(),
+    tool_getWeatherInformation_input:
+      jsonb().$type<InferToolInput<typeof getWeatherInformation>>(),
+    tool_getWeatherInformation_output:
+      jsonb().$type<InferToolOutput<typeof getWeatherInformation>>(),
+    tool_getWeatherInformation_errorText: varchar(),
+
+    tool_getLocation_toolCallId: varchar(),
+    tool_getLocation_state: varchar().$type<ToolUIPart["state"]>(),
+    tool_getLocation_input: jsonb().$type<{}>(),
+    tool_getLocation_output: jsonb().$type<{ location: string }>(),
+    tool_getLocation_errorText: varchar(),
 
     // Data parts
     // e.g.
@@ -100,10 +107,6 @@ export const parts = pgTable(
     check(
       "source_document_fields_required_if_type_is_source_document",
       sql`CASE WHEN ${t.type} = 'source_document' THEN ${t.source_document_sourceId} IS NOT NULL AND ${t.source_document_mediaType} IS NOT NULL AND ${t.source_document_title} IS NOT NULL ELSE TRUE END`,
-    ),
-    check(
-      "tool_invocation_required_if_type_is_tool_invocation",
-      sql`CASE WHEN ${t.type} = 'tool_invocation' THEN ${t.toolInvocation_toolName} IS NOT NULL AND ${t.toolInvocation_toolCallId} IS NOT NULL AND ${t.toolInvocation_state} IS NOT NULL AND (${t.toolInvocation_state} != 'result' OR ${t.toolInvocation_result} IS NOT NULL) ELSE TRUE END`,
     ),
   ],
 );

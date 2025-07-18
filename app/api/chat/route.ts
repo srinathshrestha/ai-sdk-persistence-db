@@ -1,16 +1,15 @@
+import { getLocation, getWeatherInformation } from "@/ai/tools";
 import { upsertMessage, loadChat } from "@/lib/db/actions";
 import { MyUIMessage } from "@/lib/message-type";
 import { openai } from "@ai-sdk/openai";
 import {
   streamText,
-  tool,
   createUIMessageStream,
   convertToModelMessages,
   stepCountIs,
   createUIMessageStreamResponse,
   generateId,
 } from "ai";
-import { z } from "zod";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -24,16 +23,44 @@ export async function POST(req: Request) {
   await upsertMessage({ chatId, id: message.id, message });
 
   // load the previous messages from the server:
-  const previousMessages = await loadChat(chatId);
-  const messages: MyUIMessage[] = [...previousMessages, message];
+  const messages = await loadChat(chatId);
 
-  // immediately start streaming (solves RAG issues with status, etc.)
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
+      // if the last message is a user message, create our own start step so we can start streaming data
+      // if assistant message (e.g. adding tool result, we want to keep that as part of the previous step)
+      if (message.role === "user") {
+        writer.write({
+          type: "start",
+          messageId: generateId(), // check to see if message role is assistant and then use that id
+        });
+      }
+
       Math.random() > 0.5 &&
         (() => {
-          writer.write({ type: "reasoning", text: "This is some reasoning" });
-          writer.write({ type: "reasoning-part-finish" });
+          const reasoningId = generateId();
+          writer.write({ type: "reasoning-start", id: reasoningId });
+          writer.write({
+            type: "reasoning-delta",
+            delta: "This ",
+            id: reasoningId,
+          });
+          writer.write({
+            type: "reasoning-delta",
+            delta: "is ",
+            id: reasoningId,
+          });
+          writer.write({
+            type: "reasoning-delta",
+            delta: " some",
+            id: reasoningId,
+          });
+          writer.write({
+            type: "reasoning-delta",
+            delta: " reasoning",
+            id: reasoningId,
+          });
+          writer.write({ type: "reasoning-end", id: reasoningId });
         })();
       Math.random() > 0.5 &&
         (() => {
@@ -59,39 +86,14 @@ export async function POST(req: Request) {
         stopWhen: stepCountIs(5),
         tools: {
           // server-side tool with execute function:
-          getWeatherInformation: tool({
-            description: "show the weather in a given city to the user",
-            parameters: z.object({ city: z.string() }),
-            execute: async ({ city }: { city: string }) => {
-              // Add artificial delay of 2 seconds
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-
-              const weatherOptions = [
-                "sunny",
-                "cloudy",
-                "rainy",
-                "snowy",
-                "windy",
-              ];
-
-              const weather =
-                weatherOptions[
-                  Math.floor(Math.random() * weatherOptions.length)
-                ];
-              return { city, weather };
-            },
-          }),
+          getWeatherInformation,
           // client-side tool that is automatically executed on the client:
-          getLocation: tool({
-            description:
-              "Get the user location. Always ask for confirmation before using this tool.",
-            parameters: z.object({}),
-          }),
+          getLocation,
         },
       });
 
       result.consumeStream();
-      writer.merge(result.toUIMessageStream({ newMessageId: generateId() }));
+      writer.merge(result.toUIMessageStream({ sendStart: false }));
     },
     onError: (error) => {
       // Error messages are masked by default for security reasons.
