@@ -25,4 +25,4 @@ export const getLocation = tool({
 export const tools = {
   getWeatherInformation,
   getLocation,
-};
+} satisfies ToolSet;
