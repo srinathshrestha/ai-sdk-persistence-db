@@ -61,35 +61,7 @@ export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
   return result.map((message) => ({
     id: message.id,
     role: message.role,
-    parts: message.parts.map((part) =>
-      mapDBPartToUIMessagePart(part),
-    ),
-  }));
-};
-
-export const loadChatWithPagination = async (
-  chatId: string,
-  limit = 50,
-  offset = 0,
-): Promise<MyUIMessage[]> => {
-  const result = await db.query.messages.findMany({
-    where: eq(messages.chatId, chatId),
-    with: {
-      parts: {
-        orderBy: (parts, { asc }) => [asc(parts.order)],
-      },
-    },
-    orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-    limit,
-    offset,
-  });
-
-  return result.map((message) => ({
-    id: message.id,
-    role: message.role,
-    parts: message.parts.map((part) =>
-      mapDBPartToUIMessagePart(part),
-    ),
+    parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
   }));
 };
 

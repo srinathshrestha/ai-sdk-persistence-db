@@ -19,19 +19,23 @@ export const chats = pgTable("chats", {
     .$defaultFn(() => generateId()),
 });
 
-export const messages = pgTable("messages", {
-  id: varchar()
-    .primaryKey()
-    .$defaultFn(() => generateId()),
-  chatId: varchar()
-    .references(() => chats.id, { onDelete: "cascade" })
-    .notNull(),
-  createdAt: timestamp().defaultNow().notNull(),
-  role: varchar().$type<MyUIMessage["role"]>().notNull(),
-}, (table) => [
-  index("messages_chat_id_idx").on(table.chatId),
-  index("messages_chat_id_created_at_idx").on(table.chatId, table.createdAt),
-]);
+export const messages = pgTable(
+  "messages",
+  {
+    id: varchar()
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    chatId: varchar()
+      .references(() => chats.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+    role: varchar().$type<MyUIMessage["role"]>().notNull(),
+  },
+  (table) => [
+    index("messages_chat_id_idx").on(table.chatId),
+    index("messages_chat_id_created_at_idx").on(table.chatId, table.createdAt),
+  ],
+);
 
 export const parts = pgTable(
   "parts",

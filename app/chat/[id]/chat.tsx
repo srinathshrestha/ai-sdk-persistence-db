@@ -31,14 +31,7 @@ export default function Chat({
           };
         },
       }),
-      // generateId: createIdGenerator({ prefix: "msgc", size: 16 }), // id format for client-side messages
-      // onToolCall({ toolCall }) {
-      //   if (toolCall.toolName == "getLocation") {
-      //     return { location: "London" };
-      //   }
-      // },
     });
-  console.log(messages);
 
   useEffect(() => {
     if (status === "ready") {
@@ -73,7 +66,9 @@ export default function Chat({
             <span className="font-semibold text-sm">
               {m.role === "user" ? "User: " : "AI: "}
             </span>
-            <span className="bg-gray-100 p-1 rounded-sm text-sm font-mono">{m.id}</span>
+            <span className="bg-gray-100 p-1 rounded-sm text-sm font-mono">
+              {m.id}
+            </span>
             <div className="space-y-4">
               {m.parts.map((part, i) => {
                 switch (part.type) {
@@ -193,7 +188,9 @@ export default function Chat({
                       try {
                         await deleteMessage(m.id);
                         // Find the index of the current message
-                        const messageIndex = messages.findIndex(msg => msg.id === m.id);
+                        const messageIndex = messages.findIndex(
+                          (msg) => msg.id === m.id,
+                        );
                         // Remove this message and all subsequent ones
                         setMessages((prev) => prev.slice(0, messageIndex));
                       } catch (error) {

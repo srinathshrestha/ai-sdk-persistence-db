@@ -9,6 +9,7 @@ import {
   stepCountIs,
   createUIMessageStreamResponse,
   generateId,
+  UIMessageStreamWriter,
 } from "ai";
 
 // Allow streaming responses up to 30 seconds
@@ -32,53 +33,12 @@ export async function POST(req: Request) {
       if (message.role === "user") {
         writer.write({
           type: "start",
-          messageId: generateId(), // check to see if message role is assistant and then use that id
+          messageId: generateId(),
         });
       }
 
-      Math.random() > 0.5 &&
-        (() => {
-          const reasoningId = generateId();
-          writer.write({ type: "reasoning-start", id: reasoningId });
-          writer.write({
-            type: "reasoning-delta",
-            delta: "This ",
-            id: reasoningId,
-          });
-          writer.write({
-            type: "reasoning-delta",
-            delta: "is ",
-            id: reasoningId,
-          });
-          writer.write({
-            type: "reasoning-delta",
-            delta: " some",
-            id: reasoningId,
-          });
-          writer.write({
-            type: "reasoning-delta",
-            delta: " reasoning",
-            id: reasoningId,
-          });
-          writer.write({ type: "reasoning-end", id: reasoningId });
-        })();
-      Math.random() > 0.5 &&
-        (() => {
-          writer.write({
-            type: "source-url",
-            sourceId: "https://example.com",
-            url: "https://example.com",
-          });
-        })();
-      Math.random() > 0.5 &&
-        (() => {
-          writer.write({
-            type: "source-document",
-            sourceId: "https://example.com",
-            mediaType: "file",
-            title: "Title",
-          });
-        })();
+      // test persisting different chunk types
+      randomlyWriteChunks(writer);
 
       const result = streamText({
         model: openai("gpt-4o-mini"),
@@ -115,3 +75,51 @@ export async function POST(req: Request) {
   });
   return createUIMessageStreamResponse({ stream });
 }
+
+const randomlyWriteChunks = (writer: UIMessageStreamWriter) => {
+  Math.random() > 0.5 &&
+    (() => {
+      const reasoningId = generateId();
+      writer.write({ type: "reasoning-start", id: reasoningId });
+      writer.write({
+        type: "reasoning-delta",
+        delta: "This ",
+        id: reasoningId,
+      });
+      writer.write({
+        type: "reasoning-delta",
+        delta: "is ",
+        id: reasoningId,
+      });
+      writer.write({
+        type: "reasoning-delta",
+        delta: " some",
+        id: reasoningId,
+      });
+      writer.write({
+        type: "reasoning-delta",
+        delta: " reasoning",
+        id: reasoningId,
+      });
+      writer.write({ type: "reasoning-end", id: reasoningId });
+    })();
+
+  Math.random() > 0.5 &&
+    (() => {
+      writer.write({
+        type: "source-url",
+        sourceId: "https://example.com",
+        url: "https://example.com",
+      });
+    })();
+
+  Math.random() > 0.5 &&
+    (() => {
+      writer.write({
+        type: "source-document",
+        sourceId: "https://example.com",
+        mediaType: "file",
+        title: "Title",
+      });
+    })();
+};
