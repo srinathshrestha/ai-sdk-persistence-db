@@ -66,9 +66,15 @@ export const mapUIMessagePartsToDBParts = (
           tool_getWeatherInformation_toolCallId: part.toolCallId,
           tool_getWeatherInformation_state: part.state,
           tool_getWeatherInformation_input:
-            part.state === "input-available" ? part.input : undefined,
+            part.state === "input-available" ||
+            part.state === "output-available" ||
+            part.state === "output-error"
+              ? part.input
+              : undefined,
           tool_getWeatherInformation_output:
             part.state === "output-available" ? part.output : undefined,
+          tool_getWeatherInformation_errorText:
+            part.state === "output-error" ? part.errorText : undefined,
         };
       case "tool-getLocation":
         return {
@@ -78,15 +84,22 @@ export const mapUIMessagePartsToDBParts = (
           tool_getLocation_toolCallId: part.toolCallId,
           tool_getLocation_state: part.state,
           tool_getLocation_input:
-            part.state === "input-available" ? part.input : undefined,
+            part.state === "input-available" ||
+            part.state === "output-available" ||
+            part.state === "output-error"
+              ? part.input
+              : undefined,
           tool_getLocation_output:
             part.state === "output-available" ? part.output : undefined,
+          tool_getLocation_errorText:
+            part.state === "output-error" ? part.errorText : undefined,
         };
       case "data-weather":
         return {
           messageId,
           order: index,
           type: part.type,
+          data_weather_id: part.id,
           data_weather_location: part.data.location,
           data_weather_weather: part.data.weather,
           data_weather_temperature: part.data.temperature,
