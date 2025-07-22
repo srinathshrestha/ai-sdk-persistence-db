@@ -7,12 +7,17 @@ export const metadataSchema = z.object({});
 type MyMetadata = z.infer<typeof metadataSchema>;
 
 export const dataPartSchema = z.object({
-  weather: z.object({ temperature: z.number(), location: z.string() }),
+  weather: z.object({
+    weather: z.string().optional(),
+    location: z.string().optional(),
+    temperature: z.number().optional(),
+    loading: z.boolean().default(true),
+  }),
 });
 
 export type MyDataPart = z.infer<typeof dataPartSchema>;
 
-export type MyToolSet = InferUITools<typeof tools>;
+export type MyToolSet = InferUITools<ReturnType<typeof tools>>;
 
 export type MyUIMessage = UIMessage<MyMetadata, MyDataPart, MyToolSet>;
 

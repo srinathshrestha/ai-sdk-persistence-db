@@ -82,8 +82,18 @@ export const mapUIMessagePartsToDBParts = (
           tool_getLocation_output:
             part.state === "output-available" ? part.output : undefined,
         };
+      case "data-weather":
+        return {
+          messageId,
+          order: index,
+          type: part.type,
+          data_weather_location: part.data.location,
+          data_weather_weather: part.data.weather,
+          data_weather_temperature: part.data.temperature,
+          // no need to persist loading variable -> set to false in mapping below
+        };
       default:
-        throw new Error(`Unsupported part type: ${part.type}`);
+        throw new Error(`Unsupported part type: ${part}`);
     }
   });
 };
@@ -203,6 +213,17 @@ export const mapDBPartToUIMessagePart = (
             errorText: part.tool_getLocation_errorText!,
           };
       }
+    case "data-weather":
+      return {
+        type: "data-weather",
+        data: {
+          loading: false,
+          location: part.data_weather_location!,
+          weather: part.data_weather_weather!,
+          temperature: part.data_weather_temperature!,
+        },
+        id: part.data_weather_id!,
+      };
     default:
       throw new Error(`Unsupported part type: ${part.type}`);
   }

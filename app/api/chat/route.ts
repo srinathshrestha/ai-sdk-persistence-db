@@ -1,4 +1,4 @@
-import { getLocation, getWeatherInformation } from "@/ai/tools";
+import { tools } from "@/ai/tools";
 import { upsertMessage, loadChat } from "@/lib/db/actions";
 import { MyUIMessage } from "@/lib/message-type";
 import { openai } from "@ai-sdk/openai";
@@ -44,12 +44,7 @@ export async function POST(req: Request) {
         model: openai("gpt-4o-mini"),
         messages: convertToModelMessages(messages),
         stopWhen: stepCountIs(5),
-        tools: {
-          // server-side tool with execute function:
-          getWeatherInformation,
-          // client-side tool that is automatically executed on the client:
-          getLocation,
-        },
+        tools: tools(writer), // pass message writer into tools for writing custom data parts
       });
 
       result.consumeStream();

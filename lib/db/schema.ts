@@ -4,14 +4,20 @@ import {
   integer,
   jsonb,
   pgTable,
+  real,
   text,
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
-import { MyUIMessage } from "../message-type";
-import { generateId, InferToolInput, InferToolOutput, ToolUIPart } from "ai";
+import { MyDataPart, MyUIMessage } from "../message-type";
+import { generateId, ToolUIPart } from "ai";
 import { sql } from "drizzle-orm";
-import { getWeatherInformation } from "@/ai/tools";
+import {
+  getLocationInput,
+  getLocationOutput,
+  getWeatherInformationInput,
+  getWeatherInformationOutput,
+} from "@/ai/tools";
 
 export const chats = pgTable("chats", {
   id: varchar()
@@ -76,26 +82,28 @@ export const parts = pgTable(
     tool_getWeatherInformation_toolCallId: varchar(),
     tool_getWeatherInformation_state: varchar().$type<ToolUIPart["state"]>(),
     tool_getWeatherInformation_input:
-      jsonb().$type<InferToolInput<typeof getWeatherInformation>>(),
+      jsonb().$type<getWeatherInformationInput>(),
     tool_getWeatherInformation_output:
-      jsonb().$type<InferToolOutput<typeof getWeatherInformation>>(),
+      jsonb().$type<getWeatherInformationOutput>(),
     tool_getWeatherInformation_errorText: varchar(),
 
     tool_getLocation_toolCallId: varchar(),
     tool_getLocation_state: varchar().$type<ToolUIPart["state"]>(),
-    tool_getLocation_input: jsonb().$type<{}>(),
-    tool_getLocation_output: jsonb().$type<{ location: string }>(),
+    tool_getLocation_input: jsonb().$type<getLocationInput>(),
+    tool_getLocation_output: jsonb().$type<getLocationOutput>(),
     tool_getLocation_errorText: varchar(),
 
     // Data parts
-    // e.g.
-    // data_weather_id: varchar(),
-    // data_weather_data: jsonb(),
+    data_weather_id: varchar(),
+    data_weather_location: varchar().$type<MyDataPart["weather"]["location"]>(),
+    data_weather_weather: varchar().$type<MyDataPart["weather"]["weather"]>(),
+    data_weather_temperature:
+      real().$type<MyDataPart["weather"]["temperature"]>(),
 
     providerMetadata: jsonb().$type<Record<string, any>>(),
   },
   (t) => [
-    // Indexes
+    // Indexes for performance optimisation
     index("parts_message_id_idx").on(t.messageId),
     index("parts_message_id_order_idx").on(t.messageId, t.order),
 

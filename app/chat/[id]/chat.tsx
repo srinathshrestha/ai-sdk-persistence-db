@@ -1,13 +1,14 @@
 "use client";
 
 import { deleteChat, deleteMessage } from "@/lib/db/actions";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, getToolName } from "ai";
 import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MemoizedMarkdown } from "./memoized-markdown";
 import { useEffect, useRef, useState } from "react";
 import { MyUIMessage } from "@/lib/message-type";
+import { Weather } from "./weather";
 
 export default function Chat({
   id,
@@ -22,6 +23,9 @@ export default function Chat({
       transport: new DefaultChatTransport({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ messages }) => {
+          // send only the last message and chat id
+          // we will then fetch message history (for our chatId) on server
+          // and append this message for the full context to send to the model
           const lastMessage = messages[messages.length - 1];
           return {
             body: {
@@ -66,9 +70,6 @@ export default function Chat({
             <span className="font-semibold text-sm">
               {m.role === "user" ? "User: " : "AI: "}
             </span>
-            <span className="bg-gray-100 p-1 rounded-sm text-sm font-mono">
-              {m.id}
-            </span>
             <div className="space-y-4">
               {m.parts.map((part, i) => {
                 switch (part.type) {
@@ -88,6 +89,10 @@ export default function Chat({
                         <MemoizedMarkdown id={m.id} content={part.text} />
                       </div>
                     );
+                  case "data-weather":
+                    return (
+                      <Weather key={m.id + "-part-" + i} data={part.data} />
+                    );
                   case "tool-getWeatherInformation":
                     return (
                       <details
@@ -96,7 +101,7 @@ export default function Chat({
                       >
                         <summary className="list-none cursor-pointer select-none flex justify-between items-center pr-2">
                           <span className="inline-flex items-center px-1 py-0.5 text-xs font-medium rounded-md font-mono text-zinc-900">
-                            getWeatherInformation
+                            {getToolName(part)}
                           </span>
                           {part.state === "output-available" ? (
                             <span className="text-xs text-zinc-500 ml-2">
