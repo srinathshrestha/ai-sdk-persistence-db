@@ -51,7 +51,7 @@ This application uses a prefix-based approach for persisting messages with Postg
 
 The database uses three main tables with a prefix-based column naming convention:
 
-The schema can be found in `lib/db/schema.ts`.
+The schema can be found in [`lib/db/schema.ts`](lib/db/schema.ts).
 
 #### Tables:
 
@@ -100,7 +100,7 @@ The system provides bidirectional conversion between UI messages and database st
 
 ### Available Actions
 
-Server-side functions (`lib/db/actions.ts`) handle all database operations:
+Server-side functions ([`lib/db/actions.ts`](lib/db/actions.ts)) handle all database operations:
 
 - **`createChat()`**: Creates a new chat session
 - **`upsertMessage()`**: Inserts/updates messages with atomic transactions

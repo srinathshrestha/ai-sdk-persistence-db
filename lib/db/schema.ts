@@ -9,7 +9,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
-import { MyDataPart, MyUIMessage } from "../message-type";
+import { MyDataPart, MyUIMessage, MyProviderMetadata } from "../message-type";
 import { generateId, ToolUIPart } from "ai";
 import { sql } from "drizzle-orm";
 import {
@@ -100,7 +100,7 @@ export const parts = pgTable(
     data_weather_temperature:
       real().$type<MyDataPart["weather"]["temperature"]>(),
 
-    providerMetadata: jsonb().$type<Record<string, any>>(),
+    providerMetadata: jsonb().$type<MyProviderMetadata>(),
   },
   (t) => [
     // Indexes for performance optimisation

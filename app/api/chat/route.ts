@@ -72,49 +72,46 @@ export async function POST(req: Request) {
 }
 
 const randomlyWriteChunks = (writer: UIMessageStreamWriter) => {
-  Math.random() > 0.5 &&
-    (() => {
-      const reasoningId = generateId();
-      writer.write({ type: "reasoning-start", id: reasoningId });
-      writer.write({
-        type: "reasoning-delta",
-        delta: "This ",
-        id: reasoningId,
-      });
-      writer.write({
-        type: "reasoning-delta",
-        delta: "is ",
-        id: reasoningId,
-      });
-      writer.write({
-        type: "reasoning-delta",
-        delta: " some",
-        id: reasoningId,
-      });
-      writer.write({
-        type: "reasoning-delta",
-        delta: " reasoning",
-        id: reasoningId,
-      });
-      writer.write({ type: "reasoning-end", id: reasoningId });
-    })();
+  if (Math.random() > 0.5) {
+    const reasoningId = generateId();
+    writer.write({ type: "reasoning-start", id: reasoningId });
+    writer.write({
+      type: "reasoning-delta",
+      delta: "This ",
+      id: reasoningId,
+    });
+    writer.write({
+      type: "reasoning-delta",
+      delta: "is ",
+      id: reasoningId,
+    });
+    writer.write({
+      type: "reasoning-delta",
+      delta: " some",
+      id: reasoningId,
+    });
+    writer.write({
+      type: "reasoning-delta",
+      delta: " reasoning",
+      id: reasoningId,
+    });
+    writer.write({ type: "reasoning-end", id: reasoningId });
+  }
 
-  Math.random() > 0.5 &&
-    (() => {
-      writer.write({
-        type: "source-url",
-        sourceId: "https://example.com",
-        url: "https://example.com",
-      });
-    })();
+  if (Math.random() > 0.5) {
+    writer.write({
+      type: "source-url",
+      sourceId: "https://example.com",
+      url: "https://example.com",
+    });
+  }
 
-  Math.random() > 0.5 &&
-    (() => {
-      writer.write({
-        type: "source-document",
-        sourceId: "https://example.com",
-        mediaType: "file",
-        title: "Title",
-      });
-    })();
+  if (Math.random() > 0.5) {
+    writer.write({
+      type: "source-document",
+      sourceId: "https://example.com",
+      mediaType: "file",
+      title: "Title",
+    });
+  }
 };
