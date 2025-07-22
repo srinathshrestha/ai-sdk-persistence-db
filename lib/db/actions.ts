@@ -2,12 +2,16 @@
 
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chats, messages } from "@/lib/db/schema";
-import { UIMessage } from "ai";
+import { chats, messages, parts } from "@/lib/db/schema";
+import { MyUIMessage } from "../message-type";
+import {
+  mapUIMessagePartsToDBParts,
+  mapDBPartToUIMessagePart,
+} from "@/lib/utils/message-mapping";
 
 export const createChat = async () => {
-  const [result] = await db.insert(chats).values({}).returning();
-  return result.id;
+  const [{ id }] = await db.insert(chats).values({}).returning();
+  return id;
 };
 
 export const upsertMessage = async ({
@@ -17,39 +21,52 @@ export const upsertMessage = async ({
 }: {
   id: string;
   chatId: string;
-  message: UIMessage;
+  message: MyUIMessage;
 }) => {
-  const [result] = await db
-    .insert(messages)
-    .values({
-      chatId,
-      parts: message.parts ?? [],
-      role: message.role,
-      id,
-    })
-    .onConflictDoUpdate({
-      target: messages.id,
-      set: {
-        parts: message.parts ?? [],
+  const mappedDBUIParts = mapUIMessagePartsToDBParts(message.parts, id);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(messages)
+      .values({
         chatId,
-      },
-    })
-    .returning();
-  return result;
+        role: message.role,
+        id,
+      })
+      .onConflictDoUpdate({
+        target: messages.id,
+        set: {
+          chatId,
+        },
+      });
+
+    await tx.delete(parts).where(eq(parts.messageId, id));
+    if (mappedDBUIParts.length > 0) {
+      await tx.insert(parts).values(mappedDBUIParts);
+    }
+  });
 };
 
-export const loadChat = async (chatId: string) => {
-  const messagesResult = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.chatId, chatId))
-    .orderBy(messages.createdAt);
-  return messagesResult;
+export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
+  const result = await db.query.messages.findMany({
+    where: eq(messages.chatId, chatId),
+    with: {
+      parts: {
+        orderBy: (parts, { asc }) => [asc(parts.order)],
+      },
+    },
+    orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+  });
+
+  return result.map((message) => ({
+    id: message.id,
+    role: message.role,
+    parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
+  }));
 };
 
 export const getChats = async () => {
-  const c = await db.select().from(chats);
-  return c;
+  return await db.select().from(chats);
 };
 
 export const deleteChat = async (chatId: string) => {
@@ -57,29 +74,26 @@ export const deleteChat = async (chatId: string) => {
 };
 
 export const deleteMessage = async (messageId: string) => {
-  return await db.transaction(async (tx) => {
-    const message = await tx
+  await db.transaction(async (tx) => {
+    const [targetMessage] = await tx
       .select()
       .from(messages)
       .where(eq(messages.id, messageId))
       .limit(1);
 
-    if (message.length > 0) {
-      const targetMessage = message[0];
+    if (!targetMessage) return;
 
-      const removed = await tx
-        .delete(messages)
-        .where(
-          and(
-            eq(messages.chatId, targetMessage.chatId),
-            gt(messages.createdAt, targetMessage.createdAt),
-          ),
-        ).returning();
+    // Delete all messages after this one in the chat
+    await tx
+      .delete(messages)
+      .where(
+        and(
+          eq(messages.chatId, targetMessage.chatId),
+          gt(messages.createdAt, targetMessage.createdAt),
+        ),
+      );
 
-      await tx.delete(messages).where(eq(messages.id, messageId));
-
-      return removed;
-    }
-    return false;
+    // Delete the target message (cascade delete will handle parts)
+    await tx.delete(messages).where(eq(messages.id, messageId));
   });
 };
