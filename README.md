@@ -84,7 +84,7 @@ These constraints prevent partial or corrupted message parts from being stored, 
 
 ### Message Mapping
 
-The system provides bidirectional conversion between UI messages and database storage:
+The system provides bidirectional conversion between UI messages and database storage ([`lib/utils/message-mapping.ts`](lib/utils/message-mapping.ts)):
 
 #### UI → Database (DB):
 
