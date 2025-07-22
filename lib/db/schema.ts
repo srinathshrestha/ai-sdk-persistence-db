@@ -94,7 +94,7 @@ export const parts = pgTable(
     tool_getLocation_errorText: varchar(),
 
     // Data parts
-    data_weather_id: varchar(),
+    data_weather_id: varchar().$defaultFn(() => generateId()),
     data_weather_location: varchar().$type<MyDataPart["weather"]["location"]>(),
     data_weather_weather: varchar().$type<MyDataPart["weather"]["weather"]>(),
     data_weather_temperature:
@@ -128,6 +128,18 @@ export const parts = pgTable(
     check(
       "source_document_fields_required_if_type_is_source_document",
       sql`CASE WHEN ${t.type} = 'source_document' THEN ${t.source_document_sourceId} IS NOT NULL AND ${t.source_document_mediaType} IS NOT NULL AND ${t.source_document_title} IS NOT NULL ELSE TRUE END`,
+    ),
+    check(
+      "tool_getWeatherInformation_fields_required",
+      sql`CASE WHEN ${t.type} = 'tool-getWeatherInformation' THEN ${t.tool_getWeatherInformation_toolCallId} IS NOT NULL AND ${t.tool_getWeatherInformation_state} IS NOT NULL ELSE TRUE END`,
+    ),
+    check(
+      "tool_getLocation_fields_required",
+      sql`CASE WHEN ${t.type} = 'tool-getLocation' THEN ${t.tool_getLocation_toolCallId} IS NOT NULL AND ${t.tool_getLocation_state} IS NOT NULL ELSE TRUE END`,
+    ),
+    check(
+      "data_weather_fields_required",
+      sql`CASE WHEN ${t.type} = 'data-weather' THEN ${t.data_weather_location} IS NOT NULL AND ${t.data_weather_weather} IS NOT NULL AND ${t.data_weather_temperature} IS NOT NULL ELSE TRUE END`,
     ),
   ],
 );
