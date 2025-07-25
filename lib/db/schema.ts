@@ -78,20 +78,19 @@ export const parts = pgTable(
     source_document_title: varchar(),
     source_document_filename: varchar(), // optional
 
-    // tools are stored in separate cols
-    tool_getWeatherInformation_toolCallId: varchar(),
-    tool_getWeatherInformation_state: varchar().$type<ToolUIPart["state"]>(),
+    // shared tool call columns
+    tool_toolCallId: varchar(),
+    tool_state: varchar().$type<ToolUIPart["state"]>(),
+    tool_errorText: varchar().$type<ToolUIPart["state"]>(),
+
+    // tools inputs and outputss are stored in separate cols
     tool_getWeatherInformation_input:
       jsonb().$type<getWeatherInformationInput>(),
     tool_getWeatherInformation_output:
       jsonb().$type<getWeatherInformationOutput>(),
-    tool_getWeatherInformation_errorText: varchar(),
 
-    tool_getLocation_toolCallId: varchar(),
-    tool_getLocation_state: varchar().$type<ToolUIPart["state"]>(),
     tool_getLocation_input: jsonb().$type<getLocationInput>(),
     tool_getLocation_output: jsonb().$type<getLocationOutput>(),
-    tool_getLocation_errorText: varchar(),
 
     // Data parts
     data_weather_id: varchar().$defaultFn(() => generateId()),
@@ -131,11 +130,11 @@ export const parts = pgTable(
     ),
     check(
       "tool_getWeatherInformation_fields_required",
-      sql`CASE WHEN ${t.type} = 'tool-getWeatherInformation' THEN ${t.tool_getWeatherInformation_toolCallId} IS NOT NULL AND ${t.tool_getWeatherInformation_state} IS NOT NULL ELSE TRUE END`,
+      sql`CASE WHEN ${t.type} = 'tool-getWeatherInformation' THEN ${t.tool_toolCallId} IS NOT NULL AND ${t.tool_state} IS NOT NULL ELSE TRUE END`,
     ),
     check(
       "tool_getLocation_fields_required",
-      sql`CASE WHEN ${t.type} = 'tool-getLocation' THEN ${t.tool_getLocation_toolCallId} IS NOT NULL AND ${t.tool_getLocation_state} IS NOT NULL ELSE TRUE END`,
+      sql`CASE WHEN ${t.type} = 'tool-getLocation' THEN ${t.tool_toolCallId} IS NOT NULL AND ${t.tool_state} IS NOT NULL ELSE TRUE END`,
     ),
     check(
       "data_weather_fields_required",
