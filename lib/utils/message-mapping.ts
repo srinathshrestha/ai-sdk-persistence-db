@@ -63,8 +63,8 @@ export const mapUIMessagePartsToDBParts = (
           messageId,
           order: index,
           type: part.type,
-          tool_getWeatherInformation_toolCallId: part.toolCallId,
-          tool_getWeatherInformation_state: part.state,
+          tool_toolCallId: part.toolCallId,
+          tool_state: part.state,
           tool_getWeatherInformation_input:
             part.state === "input-available" ||
             part.state === "output-available" ||
@@ -81,8 +81,8 @@ export const mapUIMessagePartsToDBParts = (
           messageId,
           order: index,
           type: part.type,
-          tool_getLocation_toolCallId: part.toolCallId,
-          tool_getLocation_state: part.state,
+          tool_toolCallId: part.toolCallId,
+          tool_state: part.state,
           tool_getLocation_input:
             part.state === "input-available" ||
             part.state === "output-available" ||
@@ -155,29 +155,29 @@ export const mapDBPartToUIMessagePart = (
         type: part.type,
       };
     case "tool-getWeatherInformation":
-      if (!part.tool_getWeatherInformation_state) {
+      if (!part.tool_state) {
         throw new Error("getWeatherInformation_state is undefined");
       }
-      switch (part.tool_getWeatherInformation_state) {
+      switch (part.tool_state) {
         case "input-streaming":
           return {
             type: "tool-getWeatherInformation",
             state: "input-streaming",
-            toolCallId: part.tool_getWeatherInformation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getWeatherInformation_input!,
           };
         case "input-available":
           return {
             type: "tool-getWeatherInformation",
             state: "input-available",
-            toolCallId: part.tool_getWeatherInformation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getWeatherInformation_input!,
           };
         case "output-available":
           return {
             type: "tool-getWeatherInformation",
             state: "output-available",
-            toolCallId: part.tool_getWeatherInformation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getWeatherInformation_input!,
             output: part.tool_getWeatherInformation_output!,
           };
@@ -185,35 +185,35 @@ export const mapDBPartToUIMessagePart = (
           return {
             type: "tool-getWeatherInformation",
             state: "output-error",
-            toolCallId: part.tool_getWeatherInformation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getWeatherInformation_input!,
-            errorText: part.tool_getWeatherInformation_errorText!,
+            errorText: part.tool_errorText!,
           };
       }
     case "tool-getLocation":
-      if (!part.tool_getLocation_state) {
+      if (!part.tool_state) {
         throw new Error("getWeatherInformation_state is undefined");
       }
-      switch (part.tool_getLocation_state) {
+      switch (part.tool_state) {
         case "input-streaming":
           return {
             type: "tool-getLocation",
             state: "input-streaming",
-            toolCallId: part.tool_getLocation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getLocation_input!,
           };
         case "input-available":
           return {
             type: "tool-getLocation",
             state: "input-available",
-            toolCallId: part.tool_getLocation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getLocation_input!,
           };
         case "output-available":
           return {
             type: "tool-getLocation",
             state: "output-available",
-            toolCallId: part.tool_getLocation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getLocation_input!,
             output: part.tool_getLocation_output!,
           };
@@ -221,9 +221,9 @@ export const mapDBPartToUIMessagePart = (
           return {
             type: "tool-getLocation",
             state: "output-error",
-            toolCallId: part.tool_getLocation_toolCallId!,
+            toolCallId: part.tool_toolCallId!,
             input: part.tool_getLocation_input!,
-            errorText: part.tool_getLocation_errorText!,
+            errorText: part.tool_errorText!,
           };
       }
     case "data-weather":
