@@ -59,10 +59,20 @@ export const loadChat = async (chatId: string): Promise<MyUIMessage[]> => {
     orderBy: (messages, { asc }) => [asc(messages.createdAt)],
   });
 
+  const allowedTypes = new Set<MyUIMessage["parts"][number]["type"]>([
+    "text",
+    "reasoning",
+    "tool-getWeatherInformation",
+    "data-weather",
+    "step-start",
+  ]);
+
   return result.map((message) => ({
     id: message.id,
     role: message.role,
-    parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
+    parts: message.parts
+      .filter((part) => allowedTypes.has(part.type))
+      .map((part) => mapDBPartToUIMessagePart(part)),
   }));
 };
 
