@@ -16,26 +16,25 @@ export default function Chat({
 }: { id?: string | undefined; initialMessages?: MyUIMessage[] } = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
-  const { status, messages, setMessages, sendMessage, addToolResult } =
-    useChat<MyUIMessage>({
-      id, // use the provided chatId
-      messages: initialMessages, // initial messages if provided
-      transport: new DefaultChatTransport({
-        api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => {
-          // send only the last message and chat id
-          // we will then fetch message history (for our chatId) on server
-          // and append this message for the full context to send to the model
-          const lastMessage = messages[messages.length - 1];
-          return {
-            body: {
-              message: lastMessage,
-              chatId: id,
-            },
-          };
-        },
-      }),
-    });
+  const { status, messages, setMessages, sendMessage } = useChat<MyUIMessage>({
+    id, // use the provided chatId
+    messages: initialMessages, // initial messages if provided
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest: ({ messages }) => {
+        // send only the last message and chat id
+        // we will then fetch message history (for our chatId) on server
+        // and append this message for the full context to send to the model
+        const lastMessage = messages[messages.length - 1];
+        return {
+          body: {
+            message: lastMessage,
+            chatId: id,
+          },
+        };
+      },
+    }),
+  });
 
   useEffect(() => {
     if (status === "ready") {
@@ -122,60 +121,7 @@ export default function Chat({
                         ) : null}
                       </details>
                     );
-                  case "tool-getLocation":
-                    return (
-                      <div key={part.toolCallId}>
-                        {part.state === "output-available" ? (
-                          <div className="font-mono text-sm bg-zinc-200 dark:bg-zinc-800 w-fit px-1 rounded-sm">
-                            Result: {part.output.location}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              addToolResult({
-                                toolCallId: part.toolCallId,
-                                output: { location: "London" },
-                              })
-                            }
-                          >
-                            Get location
-                          </button>
-                        )}
-                      </div>
-                    );
-                  case "source-url":
-                    return (
-                      <div
-                        key={m.id + "-part-" + i}
-                        className="bg-blue-50 p-2 rounded border-l-4 border-blue-400"
-                      >
-                        <span className="text-xs text-blue-600 font-medium">
-                          Source URL:
-                        </span>
-                        <a
-                          href={part.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block text-blue-600 hover:text-blue-800 underline text-sm mt-1"
-                        >
-                          {part.url}
-                        </a>
-                      </div>
-                    );
-                  case "source-document":
-                    return (
-                      <div
-                        key={m.id + "-part-" + i}
-                        className="bg-blue-50 p-2 rounded border-l-4 border-blue-400"
-                      >
-                        <span className="text-xs text-blue-600 font-medium">
-                          Source Document:
-                        </span>
-                        <div className="text-sm mt-1 text-blue-800">
-                          {part.title || "Document"}
-                        </div>
-                      </div>
-                    );
+                  // removed unsupported parts: tool-getLocation, source-url, source-document
                   default:
                     return null;
                 }
@@ -187,14 +133,14 @@ export default function Chat({
                   onClick={async () => {
                     if (
                       confirm(
-                        "Are you sure you want to proceed? This will delete all subsequent messages.",
+                        "Are you sure you want to proceed? This will delete all subsequent messages."
                       )
                     ) {
                       try {
                         await deleteMessage(m.id);
                         // Find the index of the current message
                         const messageIndex = messages.findIndex(
-                          (msg) => msg.id === m.id,
+                          (msg) => msg.id === m.id
                         );
                         // Remove this message and all subsequent ones
                         setMessages((prev) => prev.slice(0, messageIndex));

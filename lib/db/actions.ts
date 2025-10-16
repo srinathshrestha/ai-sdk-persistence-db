@@ -11,6 +11,7 @@ import {
 
 export const createChat = async () => {
   const [{ id }] = await db.insert(chats).values({}).returning();
+  // basically we are creating a new chat session in chats table with a empty {} object and returning the id of the new chat session
   return id;
 };
 
